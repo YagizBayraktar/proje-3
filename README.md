@@ -1,3 +1,5 @@
+pip install customtkinter matplotlib pyinstaller yap açmadan önceee
+
 # proje-3
 programın exe sini indirip açınca karşımıza bu ekran çıkıyor
 <img width="1443" height="891" alt="image" src="https://github.com/user-attachments/assets/a951bed5-5535-4b07-b575-6ee6ca5a6d21" />
