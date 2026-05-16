@@ -1,4 +1,4 @@
-pip install customtkinter matplotlib pyinstaller yap açmadan önceee
+pip install PyQt6  yap açmadan önceee
 
 # proje-3
 programın exe sini indirip açınca karşımıza bu ekran çıkıyor
