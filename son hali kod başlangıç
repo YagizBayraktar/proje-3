@@ -1,0 +1,3299 @@
+"""
+╔══════════════════════════════════════════════════════════════════╗
+║           3D BASKI ATÖLYE PRO v5.0  —  AI EDİSYON               ║
+║                                                                  ║
+║   YENİ: GPT-4o AI Asistan + Sesli Komut + 60 Yeni Özellik       ║
+║                     Yağız BAYRAKTAR                              ║
+╚══════════════════════════════════════════════════════════════════╝
+"""
+
+import sys, os, json, csv, math, hashlib, random, shutil, threading, time
+import tempfile, subprocess, io, base64
+from datetime import datetime, timedelta, date
+from pathlib import Path
+from typing import Optional
+
+# ── AI & SES ────────────────────────────────────────────────────────
+try:
+    from openai import OpenAI
+    OPENAI_OK = True
+except ImportError:
+    OPENAI_OK = False
+
+try:
+    import speech_recognition as sr
+    SR_OK = True
+except ImportError:
+    SR_OK = False
+
+try:
+    import pyttsx3
+    TTS_OK = True
+except ImportError:
+    TTS_OK = False
+
+try:
+    from gtts import gTTS
+    GTTS_OK = True
+except ImportError:
+    GTTS_OK = False
+
+try:
+    import qrcode
+    QR_OK = True
+except ImportError:
+    QR_OK = False
+
+try:
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib import colors as rl_colors
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+    from reportlab.lib.styles import getSampleStyleSheet
+    from reportlab.lib.units import cm
+    PDF_OK = True
+except ImportError:
+    PDF_OK = False
+
+try:
+    from PIL import Image as PILImage
+    PIL_OK = True
+except ImportError:
+    PIL_OK = False
+
+# ── Qt ──────────────────────────────────────────────────────────────
+from PyQt6.QtWidgets import (
+    QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
+    QGridLayout, QLabel, QPushButton, QLineEdit, QTextEdit, QComboBox,
+    QListWidget, QListWidgetItem, QTabWidget, QScrollArea, QFrame,
+    QSplitter, QTableWidget, QTableWidgetItem, QHeaderView,
+    QDialog, QDialogButtonBox, QMessageBox, QFileDialog, QInputDialog,
+    QProgressBar, QSlider, QCheckBox, QSpinBox, QDoubleSpinBox,
+    QDateEdit, QCalendarWidget, QGroupBox, QRadioButton, QButtonGroup,
+    QSizePolicy, QStackedWidget, QToolButton, QMenu, QStatusBar,
+    QTreeWidget, QTreeWidgetItem, QColorDialog, QFontDialog,
+    QSystemTrayIcon, QAbstractItemView, QToolBar
+)
+from PyQt6.QtCore import (
+    Qt, QTimer, QThread, pyqtSignal, QDate, QSize, QRect,
+    QPropertyAnimation, QEasingCurve, QPoint, QSettings, QObject
+)
+from PyQt6.QtGui import (
+    QIcon, QFont, QColor, QPalette, QPainter, QPen, QBrush,
+    QLinearGradient, QRadialGradient, QPixmap, QAction,
+    QKeySequence, QShortcut, QCursor, QFontMetrics
+)
+
+# ═══════════════════════════════════════════════════════════════
+#  DOSYA YOLLARI
+# ═══════════════════════════════════════════════════════════════
+DATA_DIR       = Path("atolye_data")
+DATA_DIR.mkdir(exist_ok=True)
+
+USERS_FILE     = DATA_DIR / "users.json"
+PROJECTS_FILE  = DATA_DIR / "projects.json"
+SETTINGS_FILE  = DATA_DIR / "settings.json"
+STOCK_FILE     = DATA_DIR / "stock.json"
+SALES_FILE     = DATA_DIR / "sales.json"
+EXPENSES_FILE  = DATA_DIR / "expenses.json"
+CUSTOMERS_FILE = DATA_DIR / "customers.json"
+TASKS_FILE     = DATA_DIR / "tasks.json"
+NOTES_FILE     = DATA_DIR / "notes.json"
+LOG_FILE       = DATA_DIR / "activity_log.json"
+BACKUP_DIR     = DATA_DIR / "backups"
+BACKUP_DIR.mkdir(exist_ok=True)
+TEMPLATES_FILE  = DATA_DIR / "templates.json"
+MAINTENANCE_FILE= DATA_DIR / "maintenance.json"
+CAMPAIGNS_FILE  = DATA_DIR / "campaigns.json"
+ORDERS_FILE     = DATA_DIR / "orders.json"
+PRINTERS_FILE   = DATA_DIR / "printers.json"
+CHAT_HISTORY_FILE = DATA_DIR / "chat_history.json"
+DAILY_SUMMARY_FILE= DATA_DIR / "daily_summary.json"
+TARGETS_FILE    = DATA_DIR / "targets.json"
+COUPONS_FILE    = DATA_DIR / "coupons.json"
+RECIPES_FILE    = DATA_DIR / "material_recipes.json"
+INVOICES_FILE   = DATA_DIR / "invoices.json"
+
+# ═══════════════════════════════════════════════════════════════
+#  TEMA SİSTEMİ
+# ═══════════════════════════════════════════════════════════════
+THEMES = {
+    "🌑 Karanlık": {
+        "bg": "#0D0F14", "card": "#161B22", "sidebar": "#0F1117",
+        "border": "#21262D", "accent": "#00D4FF", "accent2": "#7B2FFF",
+        "success": "#00E676", "danger": "#FF1744", "warning": "#FFD600",
+        "text": "#C9D1D9", "text_dim": "#8B949E", "input_bg": "#1C2333",
+        "header": "#00D4FF", "btn_text": "#FFFFFF",
+    },
+    "☀️ Açık": {
+        "bg": "#F0F2F5", "card": "#FFFFFF", "sidebar": "#E8EAF0",
+        "border": "#D0D7DE", "accent": "#0969DA", "accent2": "#6639BA",
+        "success": "#1A7F37", "danger": "#CF222E", "warning": "#9A6700",
+        "text": "#1F2328", "text_dim": "#636C76", "input_bg": "#F6F8FA",
+        "header": "#0969DA", "btn_text": "#FFFFFF",
+    },
+    "🔴 Kırmızı": {
+        "bg": "#0A0000", "card": "#1A0505", "sidebar": "#0D0202",
+        "border": "#3D0A0A", "accent": "#FF4444", "accent2": "#FF8800",
+        "success": "#00FF88", "danger": "#FF0000", "warning": "#FFAA00",
+        "text": "#FFD0D0", "text_dim": "#AA7777", "input_bg": "#2A0808",
+        "header": "#FF4444", "btn_text": "#FFFFFF",
+    },
+    "🌊 Okyanus": {
+        "bg": "#020B18", "card": "#071B2E", "sidebar": "#041224",
+        "border": "#0A3050", "accent": "#00B4D8", "accent2": "#0077B6",
+        "success": "#80FFDB", "danger": "#FF6B6B", "warning": "#FFD166",
+        "text": "#CAF0F8", "text_dim": "#5A8A99", "input_bg": "#071E35",
+        "header": "#00B4D8", "btn_text": "#FFFFFF",
+    },
+    "🌲 Orman": {
+        "bg": "#020A02", "card": "#071407", "sidebar": "#041004",
+        "border": "#0A2E0A", "accent": "#00E676", "accent2": "#00897B",
+        "success": "#CCFF90", "danger": "#FF6B6B", "warning": "#FFD600",
+        "text": "#CCFFCC", "text_dim": "#4A7A4A", "input_bg": "#071407",
+        "header": "#00E676", "btn_text": "#000000",
+    },
+    "🌅 Gün Batımı": {
+        "bg": "#0A0508", "card": "#1A0D15", "sidebar": "#0D0810",
+        "border": "#3D1030", "accent": "#FF6B6B", "accent2": "#FF8E53",
+        "success": "#51CF66", "danger": "#FF1744", "warning": "#FFD43B",
+        "text": "#FFE0CC", "text_dim": "#AA6680", "input_bg": "#200D18",
+        "header": "#FF6B6B", "btn_text": "#FFFFFF",
+    },
+    "💜 Mor": {
+        "bg": "#080512", "card": "#120A20", "sidebar": "#0A0618",
+        "border": "#2A1050", "accent": "#BD93F9", "accent2": "#FF79C6",
+        "success": "#50FA7B", "danger": "#FF5555", "warning": "#FFB86C",
+        "text": "#F8F8F2", "text_dim": "#6272A4", "input_bg": "#1A1030",
+        "header": "#BD93F9", "btn_text": "#FFFFFF",
+    },
+    "⚡ Neon": {
+        "bg": "#000000", "card": "#0A0A0A", "sidebar": "#050505",
+        "border": "#1A1A1A", "accent": "#00FFFF", "accent2": "#FF00FF",
+        "success": "#00FF00", "danger": "#FF0000", "warning": "#FFFF00",
+        "text": "#FFFFFF", "text_dim": "#888888", "input_bg": "#111111",
+        "header": "#00FFFF", "btn_text": "#000000",
+    },
+}
+
+# ═══════════════════════════════════════════════════════════════
+#  FİLAMENT & YAZICI VERİLERİ (orijinalden korundu)
+# ═══════════════════════════════════════════════════════════════
+FILAMENT_DATA = {
+    "eSUN PLA": {"fiyat": 650, "kategori": "PLA", "marka": "eSUN"},
+    "Sunlu PLA": {"fiyat": 600, "kategori": "PLA", "marka": "Sunlu"},
+    "Bambu PLA": {"fiyat": 1200, "kategori": "PLA", "marka": "Bambu Lab"},
+    "Polymaker PLA": {"fiyat": 900, "kategori": "PLA", "marka": "Polymaker"},
+    "Creality PLA": {"fiyat": 750, "kategori": "PLA", "marka": "Creality"},
+    "Anycubic PLA": {"fiyat": 700, "kategori": "PLA", "marka": "Anycubic"},
+    "Elegoo PLA": {"fiyat": 680, "kategori": "PLA", "marka": "Elegoo"},
+    "Prusa PLA": {"fiyat": 1300, "kategori": "PLA", "marka": "Prusa"},
+    "Flashforge PLA": {"fiyat": 800, "kategori": "PLA", "marka": "Flashforge"},
+    "eSUN PLA+": {"fiyat": 800, "kategori": "PLA+", "marka": "eSUN"},
+    "Sunlu PLA+": {"fiyat": 750, "kategori": "PLA+", "marka": "Sunlu"},
+    "Bambu PLA+": {"fiyat": 1350, "kategori": "PLA+", "marka": "Bambu Lab"},
+    "Polymaker PLA+": {"fiyat": 1000, "kategori": "PLA+", "marka": "Polymaker"},
+    "Creality PLA+": {"fiyat": 850, "kategori": "PLA+", "marka": "Creality"},
+    "eSUN PETG": {"fiyat": 900, "kategori": "PETG", "marka": "eSUN"},
+    "Sunlu PETG": {"fiyat": 850, "kategori": "PETG", "marka": "Sunlu"},
+    "Bambu PETG": {"fiyat": 1300, "kategori": "PETG", "marka": "Bambu Lab"},
+    "Polymaker PETG": {"fiyat": 1200, "kategori": "PETG", "marka": "Polymaker"},
+    "Creality PETG": {"fiyat": 950, "kategori": "PETG", "marka": "Creality"},
+    "Anycubic PETG": {"fiyat": 900, "kategori": "PETG", "marka": "Anycubic"},
+    "eSUN ABS": {"fiyat": 800, "kategori": "ABS", "marka": "eSUN"},
+    "Sunlu ABS": {"fiyat": 780, "kategori": "ABS", "marka": "Sunlu"},
+    "Bambu ABS": {"fiyat": 1200, "kategori": "ABS", "marka": "Bambu Lab"},
+    "Polymaker ABS": {"fiyat": 1100, "kategori": "ABS", "marka": "Polymaker"},
+    "eSUN ASA": {"fiyat": 1100, "kategori": "ASA", "marka": "eSUN"},
+    "Bambu ASA": {"fiyat": 1500, "kategori": "ASA", "marka": "Bambu Lab"},
+    "Polymaker ASA": {"fiyat": 1400, "kategori": "ASA", "marka": "Polymaker"},
+    "eSUN TPU": {"fiyat": 1200, "kategori": "TPU", "marka": "eSUN"},
+    "Sunlu TPU": {"fiyat": 1100, "kategori": "TPU", "marka": "Sunlu"},
+    "Bambu TPU": {"fiyat": 1700, "kategori": "TPU", "marka": "Bambu Lab"},
+    "Polymaker TPU": {"fiyat": 1600, "kategori": "TPU", "marka": "Polymaker"},
+    "eSUN Nylon": {"fiyat": 1700, "kategori": "Nylon", "marka": "eSUN"},
+    "Bambu Nylon": {"fiyat": 2600, "kategori": "Nylon", "marka": "Bambu Lab"},
+    "Polymaker Nylon": {"fiyat": 2400, "kategori": "Nylon", "marka": "Polymaker"},
+    "eSUN PC": {"fiyat": 2200, "kategori": "PC", "marka": "eSUN"},
+    "Bambu PC": {"fiyat": 3200, "kategori": "PC", "marka": "Bambu Lab"},
+    "eSUN Silk PLA": {"fiyat": 950, "kategori": "Özel", "marka": "eSUN"},
+    "Sunlu Silk PLA": {"fiyat": 900, "kategori": "Özel", "marka": "Sunlu"},
+    "eSUN Wood PLA": {"fiyat": 1100, "kategori": "Özel", "marka": "eSUN"},
+    "eSUN CF PLA": {"fiyat": 1600, "kategori": "CF", "marka": "eSUN"},
+    "Polymaker CF": {"fiyat": 2000, "kategori": "CF", "marka": "Polymaker"},
+    "eSUN PVA": {"fiyat": 1600, "kategori": "Destek", "marka": "eSUN"},
+    "eSUN HIPS": {"fiyat": 850, "kategori": "Destek", "marka": "eSUN"},
+    "Bambu Support": {"fiyat": 1400, "kategori": "Destek", "marka": "Bambu Lab"},
+    "Elegoo Resin Std": {"fiyat": 400, "kategori": "Resin", "marka": "Elegoo"},
+    "Elegoo Resin ABS-Like": {"fiyat": 550, "kategori": "Resin", "marka": "Elegoo"},
+    "Anycubic Resin Std": {"fiyat": 380, "kategori": "Resin", "marka": "Anycubic"},
+    "Anycubic Resin Plant-Based": {"fiyat": 650, "kategori": "Resin", "marka": "Anycubic"},
+}
+
+PRINTER_DATA = {
+    "Bambu Lab": {
+        "A1 Mini": {"watt": 150, "bed": "220x220", "type": "FDM"},
+        "A1": {"watt": 300, "bed": "256x256", "type": "FDM"},
+        "P1P": {"watt": 1000, "bed": "256x256", "type": "FDM"},
+        "P1S": {"watt": 1000, "bed": "256x256", "type": "FDM"},
+        "X1 Carbon": {"watt": 1000, "bed": "256x256", "type": "FDM"},
+        "H2D": {"watt": 2200, "bed": "350x320", "type": "FDM"},
+    },
+    "Creality": {
+        "Ender 3 V3 SE": {"watt": 350, "bed": "220x220", "type": "FDM"},
+        "K1": {"watt": 350, "bed": "220x220", "type": "FDM"},
+        "K1 Max": {"watt": 1000, "bed": "300x300", "type": "FDM"},
+        "K2 Plus": {"watt": 1000, "bed": "350x350", "type": "FDM"},
+    },
+    "Anycubic": {
+        "Kobra 2 Neo": {"watt": 250, "bed": "220x220", "type": "FDM"},
+        "Kobra 2 Max": {"watt": 500, "bed": "420x420", "type": "FDM"},
+        "Kobra S1": {"watt": 1000, "bed": "300x300", "type": "FDM"},
+        "Photon Mono M3": {"watt": 140, "bed": "180x163", "type": "MSLA"},
+    },
+    "Elegoo": {
+        "Neptune 4": {"watt": 300, "bed": "225x225", "type": "FDM"},
+        "Neptune 4 Pro": {"watt": 350, "bed": "225x225", "type": "FDM"},
+        "Neptune 4 Max": {"watt": 500, "bed": "420x420", "type": "FDM"},
+        "Saturn 4 Ultra": {"watt": 170, "bed": "218x123", "type": "MSLA"},
+    },
+    "Prusa": {
+        "MK4S": {"watt": 180, "bed": "250x210", "type": "FDM"},
+        "XL": {"watt": 1000, "bed": "360x360", "type": "FDM"},
+        "MINI+": {"watt": 120, "bed": "180x180", "type": "FDM"},
+    },
+    "Flashforge": {
+        "Adventurer 5M": {"watt": 350, "bed": "220x220", "type": "FDM"},
+        "Creator 4": {"watt": 800, "bed": "400x350", "type": "FDM"},
+    },
+    "Voron": {
+        "Voron 2.4": {"watt": 1200, "bed": "350x350", "type": "FDM"},
+        "Voron Trident": {"watt": 800, "bed": "300x300", "type": "FDM"},
+    },
+}
+
+# ═══════════════════════════════════════════════════════════════
+#  YARDIMCI FONKSİYONLAR
+# ═══════════════════════════════════════════════════════════════
+def load_json(path, default):
+    try:
+        if Path(path).exists():
+            with open(path, "r", encoding="utf-8") as f:
+                return json.load(f)
+    except Exception:
+        pass
+    return default
+
+def save_json(path, data):
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+def get_settings():
+    return load_json(SETTINGS_FILE, {
+        "elektrik_fiyati": 1.73,
+        "low_stock_threshold": 500,
+        "theme": "🌑 Karanlık",
+        "currency": "TL",
+        "kdv_rate": 20,
+        "backup_enabled": True,
+        "openai_api_key": "",
+        "ai_voice_enabled": True,
+        "daily_summary_hour": 9,
+        "tts_engine": "gtts",
+        "language": "tr-TR",
+        "company_name": "3D Atölye",
+        "company_address": "",
+        "company_phone": "",
+        "company_email": "",
+    })
+
+def save_settings(s):
+    save_json(SETTINGS_FILE, s)
+
+def hash_password(pw):
+    return hashlib.sha256(pw.encode()).hexdigest()
+
+def load_users():
+    return load_json(USERS_FILE, [])
+
+def save_users(u):
+    save_json(USERS_FILE, u)
+
+def u_load(filepath, user):
+    all_d = load_json(filepath, [])
+    return [x for x in all_d if x.get("owner") == user]
+
+def u_save(filepath, user, items):
+    all_d = load_json(filepath, [])
+    others = [x for x in all_d if x.get("owner") != user]
+    save_json(filepath, others + items)
+
+def log_activity(user, action, detail=""):
+    logs = load_json(LOG_FILE, [])
+    logs.append({
+        "owner": user, "action": action, "detail": detail,
+        "tarih": datetime.now().strftime("%d.%m.%Y %H:%M:%S")
+    })
+    logs = logs[-2000:]
+    save_json(LOG_FILE, logs)
+
+def calc_cost(gram, filament_name, hours, brand, model):
+    fil = FILAMENT_DATA.get(filament_name, {"fiyat": 600})
+    kg_price = fil["fiyat"]
+    f_cost = (gram / 1000) * kg_price
+    watt = PRINTER_DATA.get(brand, {}).get(model, {}).get("watt", 150)
+    e_use = (watt / 1000) * hours
+    e_price = get_settings().get("elektrik_fiyati", 1.73)
+    e_cost = e_use * e_price
+    total = f_cost + e_cost
+    return round(total, 2), round(f_cost, 2), round(e_cost, 2), watt, round(e_use, 3)
+
+def do_backup():
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    bdir = BACKUP_DIR / ts
+    bdir.mkdir()
+    for f in DATA_DIR.glob("*.json"):
+        shutil.copy(f, bdir / f.name)
+    return str(bdir)
+
+def get_daily_context(user):
+    """AI asistan için günlük bağlam oluştur"""
+    projects  = u_load(PROJECTS_FILE, user)
+    sales     = u_load(SALES_FILE, user)
+    expenses  = u_load(EXPENSES_FILE, user)
+    customers = u_load(CUSTOMERS_FILE, user)
+    tasks     = u_load(TASKS_FILE, user)
+    stock     = load_json(STOCK_FILE, {})
+    settings  = get_settings()
+    threshold = settings.get("low_stock_threshold", 500)
+
+    today = datetime.now().strftime("%d.%m.%Y")
+    t_sat = sum(s.get("satis_fiyati", 0) for s in sales)
+    t_mal = sum(p.get("toplam_maliyet", 0) for p in projects)
+    t_gid = sum(e.get("tutar", 0) for e in expenses)
+    net   = t_sat - t_mal - t_gid
+    low_stock = [k for k, v in stock.items() if 0 < v < threshold]
+    bekleyen  = [t for t in tasks if t.get("durum") != "✅ Tamamlandı"]
+    acil      = [t for t in bekleyen if "Acil" in t.get("oncelik", "")]
+
+    ctx = f"""Sen 3D Baskı Atölye PRO v5.0'ın yapay zeka asistanısın.
+Kullanıcı: {user}
+Tarih: {today}
+Şirket: {settings.get('company_name', '3D Atölye')}
+
+MEVCUT DURUM:
+- Toplam proje: {len(projects)}
+- Toplam satış geliri: {t_sat:,.2f} TL
+- Net kar/zarar: {net:,.2f} TL
+- Toplam müşteri: {len(customers)}
+- Bekleyen görev: {len(bekleyen)} (ACİL: {len(acil)})
+- Düşük stok uyarısı: {len(low_stock)} ürün
+- Düşük stoklar: {', '.join(low_stock[:5]) if low_stock else 'Yok'}
+
+Son 5 proje: {[p.get('model_adi','') for p in projects[-5:]]}
+Son 5 satış: {[(s.get('urun',''), s.get('satis_fiyati',0)) for s in sales[-5:]]}
+
+Türkçe ve İngilizce anlayabilirsin. Kısa, öz ve yararlı cevaplar ver.
+Atölye yönetimi, 3D baskı, maliyet hesaplama, müşteri ilişkileri konularında uzmansın.
+"""
+    return ctx
+
+# ═══════════════════════════════════════════════════════════════
+#  STİL YÖNETİCİSİ
+# ═══════════════════════════════════════════════════════════════
+class StyleManager:
+    _theme = THEMES["🌑 Karanlık"]
+
+    @classmethod
+    def set_theme(cls, name):
+        cls._theme = THEMES.get(name, THEMES["🌑 Karanlık"])
+
+    @classmethod
+    def t(cls, key):
+        return cls._theme.get(key, "#FFFFFF")
+
+    @classmethod
+    def get_app_stylesheet(cls):
+        T = cls._theme
+        return f"""
+        QMainWindow, QDialog {{
+            background: {T['bg']};
+        }}
+        QWidget {{
+            background: transparent;
+            color: {T['text']};
+            font-family: 'Segoe UI', 'Arial', sans-serif;
+            font-size: 13px;
+        }}
+        QLabel {{ color: {T['text']}; background: transparent; }}
+        QPushButton {{
+            background: {T['accent2']}; color: {T['btn_text']};
+            border: none; border-radius: 8px;
+            padding: 8px 16px; font-weight: bold; font-size: 13px;
+        }}
+        QPushButton:hover {{ background: {T['accent']}; }}
+        QPushButton:pressed {{ background: {T['border']}; }}
+        QLineEdit, QTextEdit, QDoubleSpinBox, QSpinBox, QDateEdit {{
+            background: {T['input_bg']}; color: {T['text']};
+            border: 1px solid {T['border']}; border-radius: 8px; padding: 6px 10px;
+        }}
+        QLineEdit:focus, QTextEdit:focus {{ border-color: {T['accent']}; }}
+        QComboBox {{
+            background: {T['input_bg']}; color: {T['text']};
+            border: 1px solid {T['border']}; border-radius: 8px; padding: 6px 10px;
+        }}
+        QComboBox QAbstractItemView {{
+            background: {T['card']}; color: {T['text']};
+            border: 1px solid {T['border']}; selection-background-color: {T['accent2']};
+        }}
+        QTabWidget::pane {{
+            border: 1px solid {T['border']}; background: {T['card']}; border-radius: 8px;
+        }}
+        QTabBar::tab {{
+            background: {T['input_bg']}; color: {T['text_dim']};
+            padding: 8px 16px; margin-right: 2px; border-radius: 6px 6px 0 0;
+        }}
+        QTabBar::tab:selected {{ background: {T['accent2']}; color: {T['btn_text']}; }}
+        QScrollBar:vertical {{
+            background: {T['input_bg']}; width: 8px; border-radius: 4px;
+        }}
+        QScrollBar::handle:vertical {{
+            background: {T['border']}; border-radius: 4px;
+        }}
+        QScrollBar::handle:vertical:hover {{ background: {T['accent']}; }}
+        QTableWidget {{
+            background: {T['card']}; color: {T['text']};
+            border: 1px solid {T['border']}; border-radius: 8px; gridline-color: {T['border']};
+        }}
+        QTableWidget::item:selected {{ background: {T['accent2']}; }}
+        QHeaderView::section {{
+            background: {T['input_bg']}; color: {T['accent']};
+            padding: 8px; border: 1px solid {T['border']}; font-weight: bold;
+        }}
+        QFrame.card {{
+            background: {T['card']}; border: 1px solid {T['border']}; border-radius: 12px;
+        }}
+        QListWidget {{
+            background: {T['card']}; color: {T['text']};
+            border: 1px solid {T['border']}; border-radius: 8px;
+        }}
+        QListWidget::item:selected {{ background: {T['accent2']}; }}
+        QProgressBar {{
+            background: {T['input_bg']}; border: 1px solid {T['border']};
+            border-radius: 4px; text-align: center;
+        }}
+        QProgressBar::chunk {{ background: {T['accent']}; border-radius: 4px; }}
+        QGroupBox {{
+            color: {T['accent']}; border: 1px solid {T['border']};
+            border-radius: 8px; margin-top: 12px; padding-top: 8px; font-weight: bold;
+        }}
+        QStatusBar {{ background: {T['sidebar']}; color: {T['text_dim']}; }}
+        QMenuBar {{ background: {T['sidebar']}; color: {T['text']}; }}
+        QMenuBar::item:selected {{ background: {T['accent2']}; }}
+        QMenu {{
+            background: {T['card']}; color: {T['text']}; border: 1px solid {T['border']};
+        }}
+        QMenu::item:selected {{ background: {T['accent2']}; }}
+        QToolTip {{
+            background: {T['card']}; color: {T['text']};
+            border: 1px solid {T['accent']}; border-radius: 4px; padding: 4px;
+        }}
+        QCalendarWidget {{ background: {T['card']}; color: {T['text']}; }}
+        QScrollArea {{ border: none; background: transparent; }}
+        QCheckBox::indicator {{
+            width: 16px; height: 16px; border: 2px solid {T['border']}; border-radius: 3px;
+        }}
+        QCheckBox::indicator:checked {{ background: {T['accent']}; border-color: {T['accent']}; }}
+        """
+
+SM = StyleManager
+
+# ═══════════════════════════════════════════════════════════════
+#  ÖZEL WİDGETLER
+# ═══════════════════════════════════════════════════════════════
+class KPICard(QFrame):
+    def __init__(self, icon, label, value, color=None, parent=None):
+        super().__init__(parent)
+        self.setMinimumHeight(100)
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(16, 12, 16, 12)
+        layout.setSpacing(4)
+        icon_lbl = QLabel(icon)
+        icon_lbl.setFont(QFont("Segoe UI Emoji", 22))
+        icon_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        name_lbl = QLabel(label)
+        name_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        name_lbl.setStyleSheet(f"color: {SM.t('text_dim')}; font-size: 11px;")
+        val_lbl = QLabel(value)
+        val_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        val_lbl.setFont(QFont("Courier New", 15, QFont.Weight.Bold))
+        c = color or SM.t("text")
+        val_lbl.setStyleSheet(f"color: {c}; font-size: 15px; font-weight: bold;")
+        layout.addWidget(icon_lbl)
+        layout.addWidget(name_lbl)
+        layout.addWidget(val_lbl)
+        self.val_lbl = val_lbl
+        self.setStyleSheet(f"QFrame {{ background: {SM.t('card')}; border: 1px solid {SM.t('border')}; border-radius: 12px; }}")
+
+
+class NavButton(QPushButton):
+    def __init__(self, icon, text, parent=None):
+        super().__init__(f" {icon}  {text}", parent)
+        self.setCheckable(True)
+        self.setMinimumHeight(44)
+        self._update_style()
+
+    def _update_style(self):
+        self.setStyleSheet(f"""
+            QPushButton {{
+                background: transparent; color: {SM.t('text')};
+                border: none; border-radius: 10px;
+                text-align: left; padding-left: 16px; font-size: 13px;
+            }}
+            QPushButton:hover {{ background: {SM.t('input_bg')}; }}
+            QPushButton:checked {{
+                background: {SM.t('accent2')}; color: {SM.t('btn_text')}; font-weight: bold;
+            }}
+        """)
+
+
+class SectionHeader(QLabel):
+    def __init__(self, text, parent=None):
+        super().__init__(text, parent)
+        self.setFont(QFont("Courier New", 14, QFont.Weight.Bold))
+        self.setStyleSheet(f"color: {SM.t('accent')}; border-bottom: 2px solid {SM.t('accent')}; padding-bottom: 4px;")
+
+
+class StyledButton(QPushButton):
+    def __init__(self, text, style="primary", parent=None):
+        super().__init__(text, parent)
+        self.setMinimumHeight(38)
+        self._apply(style)
+
+    def _apply(self, style):
+        colors = {
+            "primary": (SM.t("accent2"), SM.t("accent")),
+            "success": (SM.t("success"), "#00C060"),
+            "danger":  (SM.t("danger"),  "#C62828"),
+            "warning": (SM.t("warning"), "#E6C000"),
+            "flat":    (SM.t("input_bg"), SM.t("border")),
+            "ai":      ("#7B2FFF", "#9B4FFF"),
+        }
+        bg, hover = colors.get(style, colors["primary"])
+        tc = "#000" if style in ("success", "warning") else SM.t("btn_text")
+        self.setStyleSheet(f"""
+            QPushButton {{
+                background: {bg}; color: {tc};
+                border: none; border-radius: 8px;
+                padding: 6px 14px; font-weight: bold;
+            }}
+            QPushButton:hover {{ background: {hover}; }}
+        """)
+
+
+class CardFrame(QFrame):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setStyleSheet(f"""
+            QFrame {{
+                background: {SM.t('card')};
+                border: 1px solid {SM.t('border')};
+                border-radius: 12px;
+            }}
+        """)
+
+
+class BarChart(QWidget):
+    def __init__(self, data: dict, color="#00D4FF", parent=None):
+        super().__init__(parent)
+        self.data = data
+        self.color = QColor(color)
+        self.setMinimumHeight(120)
+
+    def paintEvent(self, e):
+        if not self.data:
+            return
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        w, h = self.width(), self.height()
+        vals = list(self.data.values())
+        keys = list(self.data.keys())
+        mx = max(vals) if max(vals) > 0 else 1
+        n = len(vals)
+        pad = 10
+        bar_w = (w - 2 * pad) / n if n > 0 else 1
+        p.setPen(Qt.PenStyle.NoPen)
+        for i, (k, v) in enumerate(zip(keys, vals)):
+            x0 = int(pad + i * bar_w + bar_w * 0.1)
+            x1 = int(pad + i * bar_w + bar_w * 0.9)
+            bh = int((v / mx) * (h - 30))
+            y0 = h - 20 - bh
+            grad = QLinearGradient(x0, y0, x0, h - 20)
+            grad.setColorAt(0, self.color)
+            grad.setColorAt(1, self.color.darker(150))
+            p.setBrush(QBrush(grad))
+            p.drawRoundedRect(x0, y0, x1 - x0, bh, 3, 3)
+            p.setPen(QColor(SM.t("text_dim")))
+            p.setFont(QFont("Courier New", 7))
+            p.drawText(x0, h - 5, k[:6])
+            if bh > 14:
+                p.setPen(QColor("white"))
+                p.drawText(x0, y0 + 12, f"{v:.0f}")
+            p.setPen(Qt.PenStyle.NoPen)
+        p.end()
+
+
+class DonutChart(QWidget):
+    COLORS = ["#00D4FF","#7B2FFF","#00E676","#FFD600","#FF1744",
+              "#FF6D00","#40C4FF","#EA80FC","#B9F6CA","#FFD180"]
+
+    def __init__(self, data: dict, size=160, parent=None):
+        super().__init__(parent)
+        self.data = data
+        self.setFixedSize(size, size)
+
+    def paintEvent(self, e):
+        if not self.data or sum(self.data.values()) == 0:
+            return
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        size = min(self.width(), self.height())
+        cx, cy = self.width() / 2, self.height() / 2
+        r_out = size / 2 - 8
+        r_in = r_out * 0.55
+        total = sum(self.data.values())
+        start = -90 * 16
+        for i, (k, v) in enumerate(self.data.items()):
+            if v <= 0: continue
+            span = int((v / total) * 360 * 16)
+            p.setBrush(QBrush(QColor(self.COLORS[i % len(self.COLORS)])))
+            p.setPen(Qt.PenStyle.NoPen)
+            p.drawPie(int(cx-r_out), int(cy-r_out), int(2*r_out), int(2*r_out), start, span)
+            start += span
+        p.setBrush(QBrush(QColor(SM.t("card"))))
+        p.drawEllipse(int(cx-r_in), int(cy-r_in), int(2*r_in), int(2*r_in))
+        p.setPen(QColor(SM.t("text")))
+        p.setFont(QFont("Courier New", 10, QFont.Weight.Bold))
+        p.drawText(int(cx-30), int(cy+5), f"{total:.0f}")
+        p.end()
+
+
+# ═══════════════════════════════════════════════════════════════
+#  AI WORKER THREAD
+# ═══════════════════════════════════════════════════════════════
+class AIWorker(QThread):
+    response_ready = pyqtSignal(str)
+    error_occurred = pyqtSignal(str)
+
+    def __init__(self, api_key, messages, model="gpt-4o"):
+        super().__init__()
+        self.api_key = api_key
+        self.messages = messages
+        self.model = model
+
+    def run(self):
+        try:
+            client = OpenAI(api_key=self.api_key)
+            resp = client.chat.completions.create(
+                model=self.model,
+                messages=self.messages,
+                max_tokens=1000,
+                temperature=0.7,
+            )
+            text = resp.choices[0].message.content
+            self.response_ready.emit(text)
+        except Exception as ex:
+            self.error_occurred.emit(str(ex))
+
+
+# ═══════════════════════════════════════════════════════════════
+#  SES TANIMA WORKER
+# ═══════════════════════════════════════════════════════════════
+class VoiceWorker(QThread):
+    text_ready = pyqtSignal(str)
+    error_occurred = pyqtSignal(str)
+    listening_started = pyqtSignal()
+
+    def __init__(self, language="tr-TR"):
+        super().__init__()
+        self.language = language
+
+    def run(self):
+        if not SR_OK:
+            self.error_occurred.emit("SpeechRecognition kurulu değil.")
+            return
+        try:
+            r = sr.Recognizer()
+            r.energy_threshold = 3000
+            r.dynamic_energy_threshold = True
+            with sr.Microphone() as source:
+                self.listening_started.emit()
+                r.adjust_for_ambient_noise(source, duration=0.5)
+                audio = r.listen(source, timeout=8, phrase_time_limit=15)
+            # Önce Türkçe dene
+            try:
+                text = r.recognize_google(audio, language="tr-TR")
+                self.text_ready.emit(text)
+            except Exception:
+                try:
+                    text = r.recognize_google(audio, language="en-US")
+                    self.text_ready.emit(text)
+                except Exception as ex2:
+                    self.error_occurred.emit(f"Ses anlaşılamadı: {ex2}")
+        except Exception as ex:
+            self.error_occurred.emit(f"Mikrofon hatası: {ex}")
+
+
+# ═══════════════════════════════════════════════════════════════
+#  TTS WORKER
+# ═══════════════════════════════════════════════════════════════
+class TTSWorker(QThread):
+    def __init__(self, text, engine="gtts"):
+        super().__init__()
+        self.text = text
+        self.engine = engine
+
+    def run(self):
+        try:
+            if self.engine == "gtts" and GTTS_OK:
+                tts = gTTS(text=self.text, lang="tr", slow=False)
+                tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".mp3")
+                tts.save(tmp.name)
+                if sys.platform == "win32":
+                    os.startfile(tmp.name)
+                elif sys.platform == "darwin":
+                    subprocess.run(["afplay", tmp.name])
+                else:
+                    subprocess.run(["mpg321", tmp.name], capture_output=True)
+                time.sleep(1)
+                os.unlink(tmp.name)
+            elif TTS_OK:
+                engine = pyttsx3.init()
+                engine.say(self.text)
+                engine.runAndWait()
+        except Exception:
+            pass
+
+
+# ═══════════════════════════════════════════════════════════════
+#  AI ASISTAN PANELİ (sağ alt yüzer)
+# ═══════════════════════════════════════════════════════════════
+class AIAssistantPanel(QWidget):
+    def __init__(self, user, parent=None):
+        super().__init__(parent)
+        self.user = user
+        self.chat_history = []  # OpenAI format
+        self.tts_worker = None
+        self.voice_worker = None
+        self.ai_worker = None
+        self.is_minimized = False
+        self._load_history()
+        self._build_ui()
+
+    def _load_history(self):
+        all_h = load_json(CHAT_HISTORY_FILE, {})
+        self.chat_history = all_h.get(self.user, [])[-20:]  # Son 20 mesaj
+
+    def _save_history(self):
+        all_h = load_json(CHAT_HISTORY_FILE, {})
+        all_h[self.user] = self.chat_history[-50:]
+        save_json(CHAT_HISTORY_FILE, all_h)
+
+    def _build_ui(self):
+        self.setFixedWidth(380)
+        self.setMinimumHeight(520)
+        self.setStyleSheet(f"""
+            QWidget {{
+                background: {SM.t('card')};
+                border: 2px solid {SM.t('accent2')};
+                border-radius: 16px;
+            }}
+        """)
+
+        main_l = QVBoxLayout(self)
+        main_l.setContentsMargins(0, 0, 0, 0)
+        main_l.setSpacing(0)
+
+        # ── HEADER ──────────────────────────────────
+        header = QWidget()
+        header.setFixedHeight(54)
+        header.setStyleSheet(f"""
+            QWidget {{
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                    stop:0 {SM.t('accent2')}, stop:1 {SM.t('accent')});
+                border-radius: 14px 14px 0 0;
+                border: none;
+            }}
+        """)
+        hl = QHBoxLayout(header)
+        hl.setContentsMargins(14, 8, 14, 8)
+
+        ai_icon = QLabel("🤖")
+        ai_icon.setFont(QFont("Segoe UI Emoji", 20))
+        ai_icon.setStyleSheet("border: none; background: transparent;")
+
+        ai_title = QLabel("AI Asistan  ·  GPT-4o")
+        ai_title.setFont(QFont("Courier New", 12, QFont.Weight.Bold))
+        ai_title.setStyleSheet("color: white; border: none; background: transparent;")
+
+        self.status_dot = QLabel("●")
+        self.status_dot.setStyleSheet("color: #00FF88; border: none; background: transparent; font-size: 10px;")
+
+        self.minimize_btn = QPushButton("─")
+        self.minimize_btn.setFixedSize(28, 28)
+        self.minimize_btn.setStyleSheet("""
+            QPushButton {
+                background: rgba(255,255,255,0.2); color: white;
+                border: none; border-radius: 14px; font-weight: bold;
+            }
+            QPushButton:hover { background: rgba(255,255,255,0.4); }
+        """)
+        self.minimize_btn.clicked.connect(self._toggle_minimize)
+
+        hl.addWidget(ai_icon)
+        hl.addWidget(ai_title)
+        hl.addStretch()
+        hl.addWidget(self.status_dot)
+        hl.addSpacing(6)
+        hl.addWidget(self.minimize_btn)
+        main_l.addWidget(header)
+
+        # ── BODY ────────────────────────────────────
+        self.body_widget = QWidget()
+        self.body_widget.setStyleSheet("border: none; background: transparent;")
+        body_l = QVBoxLayout(self.body_widget)
+        body_l.setContentsMargins(12, 8, 12, 8)
+        body_l.setSpacing(6)
+
+        # Chat alanı
+        self.chat_display = QTextEdit()
+        self.chat_display.setReadOnly(True)
+        self.chat_display.setFont(QFont("Segoe UI", 12))
+        self.chat_display.setStyleSheet(f"""
+            QTextEdit {{
+                background: {SM.t('bg')};
+                color: {SM.t('text')};
+                border: 1px solid {SM.t('border')};
+                border-radius: 10px;
+                padding: 8px;
+            }}
+        """)
+        self.chat_display.setMinimumHeight(280)
+        body_l.addWidget(self.chat_display)
+
+        # Hızlı sorular
+        quick_scroll = QScrollArea()
+        quick_scroll.setFixedHeight(42)
+        quick_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        quick_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        quick_scroll.setWidgetResizable(True)
+        quick_scroll.setStyleSheet("border: none; background: transparent;")
+        quick_w = QWidget()
+        quick_w.setStyleSheet("background: transparent; border: none;")
+        quick_l = QHBoxLayout(quick_w)
+        quick_l.setContentsMargins(0, 2, 0, 2)
+        quick_l.setSpacing(6)
+        quick_questions = [
+            "📊 Günlük Özet", "💰 Kar/Zarar", "📦 Düşük Stok",
+            "👥 En İyi Müşteri", "📈 Tavsiye", "🔧 Bakım Gerekli mi?",
+        ]
+        for q in quick_questions:
+            btn = QPushButton(q)
+            btn.setFixedHeight(30)
+            btn.setStyleSheet(f"""
+                QPushButton {{
+                    background: {SM.t('input_bg')};
+                    color: {SM.t('accent')};
+                    border: 1px solid {SM.t('accent2')};
+                    border-radius: 15px; padding: 2px 10px;
+                    font-size: 11px; font-weight: bold;
+                }}
+                QPushButton:hover {{ background: {SM.t('accent2')}; color: white; }}
+            """)
+            btn.clicked.connect(lambda _, qq=q: self._quick_question(qq))
+            quick_l.addWidget(btn)
+        quick_l.addStretch()
+        quick_scroll.setWidget(quick_w)
+        body_l.addWidget(quick_scroll)
+
+        # Input alanı
+        input_row = QHBoxLayout()
+        input_row.setSpacing(6)
+
+        self.input_field = QLineEdit()
+        self.input_field.setPlaceholderText("Bir şey sor... (Enter ile gönder)")
+        self.input_field.setMinimumHeight(40)
+        self.input_field.setStyleSheet(f"""
+            QLineEdit {{
+                background: {SM.t('input_bg')};
+                color: {SM.t('text')};
+                border: 2px solid {SM.t('accent2')};
+                border-radius: 20px;
+                padding: 6px 14px;
+            }}
+            QLineEdit:focus {{ border-color: {SM.t('accent')}; }}
+        """)
+        self.input_field.returnPressed.connect(self._send_message)
+
+        send_btn = QPushButton("➤")
+        send_btn.setFixedSize(40, 40)
+        send_btn.setStyleSheet(f"""
+            QPushButton {{
+                background: {SM.t('accent2')}; color: white;
+                border: none; border-radius: 20px; font-size: 16px;
+            }}
+            QPushButton:hover {{ background: {SM.t('accent')}; }}
+        """)
+        send_btn.clicked.connect(self._send_message)
+
+        # Mikrofon butonu
+        self.mic_btn = QPushButton("🎤")
+        self.mic_btn.setFixedSize(40, 40)
+        self.mic_btn.setStyleSheet(f"""
+            QPushButton {{
+                background: {SM.t('danger')}; color: white;
+                border: none; border-radius: 20px; font-size: 16px;
+            }}
+            QPushButton:hover {{ background: #FF4444; }}
+        """)
+        self.mic_btn.clicked.connect(self._start_voice)
+        self.mic_btn.setToolTip("Sesli komut (Türkçe / İngilizce)")
+
+        input_row.addWidget(self.input_field)
+        input_row.addWidget(self.mic_btn)
+        input_row.addWidget(send_btn)
+        body_l.addLayout(input_row)
+
+        # Alt butonlar
+        bottom_row = QHBoxLayout()
+        bottom_row.setSpacing(6)
+
+        self.voice_toggle = QCheckBox("🔊 Sesli Yanıt")
+        self.voice_toggle.setChecked(get_settings().get("ai_voice_enabled", True))
+        self.voice_toggle.setStyleSheet(f"color: {SM.t('text_dim')}; border: none; font-size: 11px;")
+
+        clear_btn = QPushButton("🗑 Temizle")
+        clear_btn.setFixedHeight(28)
+        clear_btn.setStyleSheet(f"""
+            QPushButton {{
+                background: transparent; color: {SM.t('text_dim')};
+                border: 1px solid {SM.t('border')}; border-radius: 6px;
+                font-size: 11px; padding: 2px 8px;
+            }}
+            QPushButton:hover {{ background: {SM.t('input_bg')}; }}
+        """)
+        clear_btn.clicked.connect(self._clear_chat)
+
+        summary_btn = QPushButton("📋 Günlük Özet")
+        summary_btn.setFixedHeight(28)
+        summary_btn.setStyleSheet(f"""
+            QPushButton {{
+                background: {SM.t('accent2')}; color: white;
+                border: none; border-radius: 6px;
+                font-size: 11px; padding: 2px 8px; font-weight: bold;
+            }}
+            QPushButton:hover {{ background: {SM.t('accent')}; }}
+        """)
+        summary_btn.clicked.connect(self._daily_summary)
+
+        bottom_row.addWidget(self.voice_toggle)
+        bottom_row.addStretch()
+        bottom_row.addWidget(clear_btn)
+        bottom_row.addWidget(summary_btn)
+        body_l.addLayout(bottom_row)
+
+        # Typing indicator
+        self.typing_lbl = QLabel("")
+        self.typing_lbl.setStyleSheet(f"color: {SM.t('accent')}; font-size: 11px; border: none;")
+        self.typing_lbl.setAlignment(Qt.AlignmentFlag.AlignLeft)
+        body_l.addWidget(self.typing_lbl)
+
+        main_l.addWidget(self.body_widget)
+
+        # İlk mesaj
+        self._append_message("🤖", "Merhaba! Ben atölyenin AI asistanıyım 🎯\n\nSana şu konularda yardımcı olabilirim:\n• Maliyet & fiyat hesaplama\n• Stok & satış analizi\n• Müşteri tavsiyeleri\n• 3D baskı önerileri\n\nNe öğrenmek istersin?")
+
+    def _toggle_minimize(self):
+        self.is_minimized = not self.is_minimized
+        self.body_widget.setVisible(not self.is_minimized)
+        self.minimize_btn.setText("□" if self.is_minimized else "─")
+        if self.is_minimized:
+            self.setFixedHeight(54)
+        else:
+            self.setMinimumHeight(520)
+            self.setFixedHeight(520)
+
+    def _append_message(self, sender, text, color=None):
+        cursor = self.chat_display.textCursor()
+        cursor.movePosition(cursor.MoveOperation.End)
+        self.chat_display.setTextCursor(cursor)
+
+        if sender == "🤖":
+            bg = SM.t("input_bg")
+            tc = SM.t("accent")
+            align = "left"
+        else:
+            bg = SM.t("accent2")
+            tc = "white"
+            align = "right"
+
+        time_str = datetime.now().strftime("%H:%M")
+        html = f"""
+        <div style="text-align:{align}; margin:6px 0;">
+            <span style="font-size:11px; color:{SM.t('text_dim')};">{sender} {time_str}</span><br>
+            <span style="background:{bg}; color:{tc}; border-radius:10px;
+                         padding:6px 10px; display:inline-block; max-width:280px;
+                         font-size:12px; white-space:pre-wrap;">{text}</span>
+        </div>
+        """
+        self.chat_display.insertHtml(html)
+        self.chat_display.ensureCursorVisible()
+
+    def _send_message(self):
+        text = self.input_field.text().strip()
+        if not text:
+            return
+        self.input_field.clear()
+        self._append_message("👤", text)
+
+        settings = get_settings()
+        api_key = settings.get("openai_api_key", "")
+        if not api_key:
+            self._append_message("🤖", "⚠️ API anahtarı yok!\nAyarlar → AI Asistan sekmesine gidip OpenAI API key'ini gir.")
+            return
+
+        # Sistem mesajı
+        ctx = get_daily_context(self.user)
+        messages = [{"role": "system", "content": ctx}]
+        # Geçmiş ekle
+        for h in self.chat_history[-10:]:
+            messages.append(h)
+        messages.append({"role": "user", "content": text})
+        self.chat_history.append({"role": "user", "content": text})
+
+        self.typing_lbl.setText("⏳ AI düşünüyor...")
+        self.status_dot.setStyleSheet("color: #FFD600; border: none; background: transparent; font-size: 10px;")
+
+        self.ai_worker = AIWorker(api_key, messages, "gpt-4o")
+        self.ai_worker.response_ready.connect(self._on_ai_response)
+        self.ai_worker.error_occurred.connect(self._on_ai_error)
+        self.ai_worker.start()
+
+    def _on_ai_response(self, text):
+        self.typing_lbl.setText("")
+        self.status_dot.setStyleSheet("color: #00FF88; border: none; background: transparent; font-size: 10px;")
+        self._append_message("🤖", text)
+        self.chat_history.append({"role": "assistant", "content": text})
+        self._save_history()
+
+        if self.voice_toggle.isChecked():
+            self._speak(text[:300])  # İlk 300 karakter
+
+    def _on_ai_error(self, err):
+        self.typing_lbl.setText("")
+        self.status_dot.setStyleSheet("color: #FF1744; border: none; background: transparent; font-size: 10px;")
+        self._append_message("🤖", f"❌ Hata: {err}")
+
+    def _quick_question(self, question):
+        q_map = {
+            "📊 Günlük Özet": "Bugünkü atölye durumunu özetle. Önemli uyarılar var mı?",
+            "💰 Kar/Zarar": "Toplam kar/zarar durumumu analiz et ve iyileştirme önerisi ver.",
+            "📦 Düşük Stok": "Düşük stokları listele ve ne zaman sipariş vermem gerektiğini söyle.",
+            "👥 En İyi Müşteri": "En değerli müşterilerimi analiz et ve ilişki önerileri ver.",
+            "📈 Tavsiye": "Atölyemi büyütmek için 3 somut tavsiye ver.",
+            "🔧 Bakım Gerekli mi?": "Yazıcı bakım durumumu değerlendir.",
+        }
+        self.input_field.setText(q_map.get(question, question))
+        self._send_message()
+
+    def _daily_summary(self):
+        self.input_field.setText("Bugünün tam özetini ver: satışlar, kar, uyarılar, öneriler. Madde madde yaz.")
+        self._send_message()
+
+    def _start_voice(self):
+        if not SR_OK:
+            self._append_message("🤖", "❌ SpeechRecognition kurulu değil.\npip install SpeechRecognition pyaudio")
+            return
+        self.mic_btn.setText("🔴")
+        self.mic_btn.setStyleSheet("""
+            QPushButton {
+                background: #FF0000; color: white;
+                border: none; border-radius: 20px; font-size: 16px;
+                animation: pulse 1s infinite;
+            }
+        """)
+        self.typing_lbl.setText("🎤 Dinleniyor... (Türkçe / İngilizce)")
+
+        self.voice_worker = VoiceWorker()
+        self.voice_worker.text_ready.connect(self._on_voice_text)
+        self.voice_worker.error_occurred.connect(self._on_voice_error)
+        self.voice_worker.listening_started.connect(lambda: self.typing_lbl.setText("🎙️ Konuşun..."))
+        self.voice_worker.start()
+
+    def _on_voice_text(self, text):
+        self.mic_btn.setText("🎤")
+        self.mic_btn.setStyleSheet(f"""
+            QPushButton {{
+                background: {SM.t('danger')}; color: white;
+                border: none; border-radius: 20px; font-size: 16px;
+            }}
+        """)
+        self.typing_lbl.setText(f"✅ Anlaşıldı: {text}")
+        self.input_field.setText(text)
+        self._send_message()
+
+    def _on_voice_error(self, err):
+        self.mic_btn.setText("🎤")
+        self.typing_lbl.setText(f"❌ {err}")
+
+    def _speak(self, text):
+        settings = get_settings()
+        engine = settings.get("tts_engine", "gtts")
+        self.tts_worker = TTSWorker(text, engine)
+        self.tts_worker.start()
+
+    def _clear_chat(self):
+        self.chat_display.clear()
+        self.chat_history = []
+        self._save_history()
+        self._append_message("🤖", "Konuşma geçmişi temizlendi. Nasıl yardımcı olabilirim?")
+
+
+# ═══════════════════════════════════════════════════════════════
+#  GÜNLÜK ÖZET SERVİSİ
+# ═══════════════════════════════════════════════════════════════
+class DailySummaryService(QObject):
+    summary_ready = pyqtSignal(str)
+
+    def __init__(self, user):
+        super().__init__()
+        self.user = user
+        self.timer = QTimer()
+        self.timer.timeout.connect(self._check_summary)
+        self.timer.start(60000)  # Her dakika kontrol
+        self.last_summary_date = ""
+
+    def _check_summary(self):
+        settings = get_settings()
+        hour = settings.get("daily_summary_hour", 9)
+        now = datetime.now()
+        today = now.strftime("%d.%m.%Y")
+        if now.hour == hour and today != self.last_summary_date:
+            self.last_summary_date = today
+            self._generate_summary()
+
+    def _generate_summary(self):
+        settings = get_settings()
+        api_key = settings.get("openai_api_key", "")
+        if not api_key:
+            return
+        ctx = get_daily_context(self.user)
+        messages = [
+            {"role": "system", "content": ctx},
+            {"role": "user", "content": f"Bugün {datetime.now().strftime('%d.%m.%Y %H:%M')} için günlük atölye özetini hazırla. Kısa tut, önemli uyarıları öne çıkar."}
+        ]
+        self.worker = AIWorker(api_key, messages)
+        self.worker.response_ready.connect(lambda t: self.summary_ready.emit(t))
+        self.worker.start()
+
+        # Kaydet
+        all_s = load_json(DAILY_SUMMARY_FILE, {})
+        all_s[self.user] = all_s.get(self.user, [])
+        all_s[self.user].append({
+            "tarih": datetime.now().strftime("%d.%m.%Y"),
+            "saat": datetime.now().strftime("%H:%M"),
+            "durum": "oluşturuldu"
+        })
+        save_json(DAILY_SUMMARY_FILE, all_s)
+
+
+# ═══════════════════════════════════════════════════════════════
+#  GİRİŞ SAYFASI
+# ═══════════════════════════════════════════════════════════════
+class AuthPage(QWidget):
+    login_success = pyqtSignal(str)
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._build_ui()
+
+    def _build_ui(self):
+        main = QHBoxLayout(self)
+        main.setSpacing(0)
+        main.setContentsMargins(40, 40, 40, 40)
+
+        # Sol panel
+        left = CardFrame()
+        left.setMinimumWidth(480)
+        ll = QVBoxLayout(left)
+        ll.setContentsMargins(36, 36, 36, 36)
+        ll.setSpacing(10)
+
+        accent_bar = QFrame()
+        accent_bar.setFixedHeight(4)
+        accent_bar.setStyleSheet(f"background: {SM.t('accent')}; border-radius: 2px;")
+        ll.addWidget(accent_bar)
+
+        title = QLabel("3D BASKI\nATÖLYE PRO")
+        title.setFont(QFont("Courier New", 36, QFont.Weight.Bold))
+        title.setStyleSheet(f"color: {SM.t('accent')}; border: none;")
+        ll.addWidget(title)
+
+        sub = QLabel("v5.0  ·  AI Asistan + Sesli Komut + 125+ Özellik")
+        sub.setStyleSheet(f"color: {SM.t('text_dim')}; font-size: 14px; border: none;")
+        ll.addWidget(sub)
+        ll.addSpacing(10)
+
+        badges = QHBoxLayout()
+        for txt, col in [("🤖 GPT-4o", SM.t("accent")), ("🎤 Sesli", SM.t("accent2")),
+                          ("📊 CRM", SM.t("success")), ("💰 Finans", SM.t("warning")),
+                          ("📄 PDF", SM.t("danger"))]:
+            b = QLabel(txt)
+            b.setStyleSheet(f"color: {col}; font-weight: bold; border: none;")
+            badges.addWidget(b)
+        badges.addStretch()
+        ll.addLayout(badges)
+        ll.addSpacing(8)
+
+        features = [
+            "🤖  GPT-4o AI asistan — atölyeni anlayan zeka",
+            "🎤  Sesli komut (Türkçe + İngilizce)",
+            "📅  Her gün otomatik özet bildirimi",
+            "📄  PDF fatura & QR kod üretici",
+            "📦  Filament & sarf malzeme stok takibi",
+            "💰  Satış, KDV, indirim & fatura sistemi",
+            "📈  Gelir/gider/kar grafikleri",
+            "👥  Müşteri CRM & sadakat puanı",
+            "🖨️  Çoklu yazıcı & bakım takvimi",
+            "📊  Kampanya, kupon & indirim sistemi",
+            "🔧  Kanban üretim hattı görünümü",
+            "💾  Otomatik yedekleme + CSV import/export",
+        ]
+        for f in features:
+            lbl = QLabel(f)
+            lbl.setStyleSheet(f"color: {SM.t('text')}; font-size: 13px; border: none;")
+            ll.addWidget(lbl)
+
+        ll.addStretch()
+        ver = QLabel("v5.0 AI Edition  ·  PyQt6  ·  2025  ·  Yağız BAYRAKTAR")
+        ver.setStyleSheet(f"color: {SM.t('border')}; font-size: 11px; border: none;")
+        ll.addWidget(ver)
+
+        main.addWidget(left)
+        main.addSpacing(24)
+
+        # Sağ panel
+        right = CardFrame()
+        right.setFixedWidth(420)
+        rl = QVBoxLayout(right)
+        rl.setContentsMargins(32, 32, 32, 32)
+
+        tabs = QTabWidget()
+        tabs.setMinimumHeight(520)
+
+        # Giriş tab
+        login_w = QWidget()
+        login_l = QVBoxLayout(login_w)
+        login_l.setSpacing(10)
+        login_l.setContentsMargins(10, 20, 10, 10)
+
+        lbl_hw = QLabel("HOŞ GELDİN 👋")
+        lbl_hw.setFont(QFont("Courier New", 22, QFont.Weight.Bold))
+        lbl_hw.setStyleSheet(f"color: {SM.t('accent')}; border: none;")
+        lbl_hw.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        login_l.addWidget(lbl_hw)
+
+        sub2 = QLabel("Hesabına giriş yap")
+        sub2.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        sub2.setStyleSheet(f"color: {SM.t('text_dim')}; border: none;")
+        login_l.addWidget(sub2)
+        login_l.addSpacing(16)
+
+        self.login_user = QLineEdit()
+        self.login_user.setPlaceholderText("👤 Kullanıcı adı")
+        self.login_user.setMinimumHeight(44)
+
+        self.login_pass = QLineEdit()
+        self.login_pass.setPlaceholderText("🔒 Şifre")
+        self.login_pass.setEchoMode(QLineEdit.EchoMode.Password)
+        self.login_pass.setMinimumHeight(44)
+        self.login_pass.returnPressed.connect(self._do_login)
+
+        login_btn = StyledButton("  GİRİŞ YAP  →")
+        login_btn.setMinimumHeight(48)
+        login_btn.clicked.connect(self._do_login)
+
+        self.login_info = QLabel("")
+        self.login_info.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.login_info.setStyleSheet(f"color: {SM.t('danger')}; border: none;")
+
+        demo_btn = StyledButton("🎮 Demo ile Dene", "flat")
+        demo_btn.clicked.connect(self._demo_login)
+
+        for w in [self.login_user, self.login_pass, login_btn, self.login_info, demo_btn]:
+            login_l.addWidget(w)
+        login_l.addStretch()
+
+        # Kayıt tab
+        reg_w = QWidget()
+        reg_l = QVBoxLayout(reg_w)
+        reg_l.setSpacing(10)
+        reg_l.setContentsMargins(10, 20, 10, 10)
+
+        lbl_reg = QLabel("HESAP OLUŞTUR")
+        lbl_reg.setFont(QFont("Courier New", 20, QFont.Weight.Bold))
+        lbl_reg.setStyleSheet(f"color: {SM.t('accent')}; border: none;")
+        lbl_reg.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        reg_l.addWidget(lbl_reg)
+        reg_l.addSpacing(16)
+
+        self.reg_user  = QLineEdit(); self.reg_user.setPlaceholderText("👤 Kullanıcı adı (min. 3)"); self.reg_user.setMinimumHeight(44)
+        self.reg_email = QLineEdit(); self.reg_email.setPlaceholderText("📧 E-posta"); self.reg_email.setMinimumHeight(44)
+        self.reg_pass  = QLineEdit(); self.reg_pass.setPlaceholderText("🔒 Şifre (min. 4)"); self.reg_pass.setEchoMode(QLineEdit.EchoMode.Password); self.reg_pass.setMinimumHeight(44)
+        self.reg_pass2 = QLineEdit(); self.reg_pass2.setPlaceholderText("🔒 Şifre tekrar"); self.reg_pass2.setEchoMode(QLineEdit.EchoMode.Password); self.reg_pass2.setMinimumHeight(44)
+
+        reg_btn = StyledButton("  KAYIT OL  →", "success")
+        reg_btn.setMinimumHeight(48)
+        reg_btn.clicked.connect(self._do_register)
+
+        self.reg_info = QLabel("")
+        self.reg_info.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.reg_info.setWordWrap(True)
+        self.reg_info.setStyleSheet(f"color: {SM.t('success')}; border: none;")
+
+        for w in [self.reg_user, self.reg_email, self.reg_pass, self.reg_pass2, reg_btn, self.reg_info]:
+            reg_l.addWidget(w)
+        reg_l.addStretch()
+
+        tabs.addTab(login_w, "  Giriş Yap  ")
+        tabs.addTab(reg_w,   "  Kayıt Ol  ")
+        rl.addWidget(tabs)
+
+        main.addWidget(right)
+
+    def _do_login(self):
+        u = self.login_user.text().strip()
+        p = self.login_pass.text().strip()
+        users = load_users()
+        ph = hash_password(p)
+        for user in users:
+            if user["username"] == u and (user.get("password_hash") == ph or user.get("password") == p):
+                log_activity(u, "GİRİŞ")
+                self.login_success.emit(u)
+                return
+        self.login_info.setText("✗  Kullanıcı adı veya şifre hatalı.")
+
+    def _demo_login(self):
+        users = load_users()
+        if not any(u["username"] == "demo" for u in users):
+            users.append({
+                "username": "demo", "password_hash": hash_password("demo"),
+                "email": "demo@atolye.pro", "role": "admin",
+                "created_at": datetime.now().strftime("%d.%m.%Y %H:%M"),
+            })
+            save_users(users)
+        log_activity("demo", "DEMO GİRİŞ")
+        self.login_success.emit("demo")
+
+    def _do_register(self):
+        u = self.reg_user.text().strip()
+        e = self.reg_email.text().strip()
+        p = self.reg_pass.text().strip()
+        p2 = self.reg_pass2.text().strip()
+        if len(u) < 3:
+            self.reg_info.setStyleSheet(f"color: {SM.t('danger')}; border: none;")
+            self.reg_info.setText("✗  En az 3 karakter."); return
+        if len(p) < 4:
+            self.reg_info.setStyleSheet(f"color: {SM.t('danger')}; border: none;")
+            self.reg_info.setText("✗  En az 4 karakterli şifre."); return
+        if p != p2:
+            self.reg_info.setStyleSheet(f"color: {SM.t('danger')}; border: none;")
+            self.reg_info.setText("✗  Şifreler eşleşmiyor."); return
+        users = load_users()
+        if any(x["username"] == u for x in users):
+            self.reg_info.setStyleSheet(f"color: {SM.t('danger')}; border: none;")
+            self.reg_info.setText("✗  Bu kullanıcı adı alınmış."); return
+        users.append({
+            "username": u, "email": e, "password_hash": hash_password(p),
+            "role": "admin", "created_at": datetime.now().strftime("%d.%m.%Y %H:%M"),
+        })
+        save_users(users)
+        self.reg_info.setStyleSheet(f"color: {SM.t('success')}; border: none;")
+        self.reg_info.setText("✓  Kayıt başarılı! Giriş yapabilirsin.")
+
+
+# ═══════════════════════════════════════════════════════════════
+#  DASHBOARD
+# ═══════════════════════════════════════════════════════════════
+class DashboardPage(QWidget):
+    def __init__(self, user, parent=None):
+        super().__init__(parent)
+        self.user = user
+        self._build_ui()
+        self._refresh()
+
+    def _build_ui(self):
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        content = QWidget()
+        self.cl = QVBoxLayout(content)
+        self.cl.setContentsMargins(20, 16, 20, 20)
+        self.cl.setSpacing(12)
+        scroll.setWidget(content)
+        layout.addWidget(scroll)
+
+    def _refresh(self):
+        while self.cl.count():
+            item = self.cl.takeAt(0)
+            if item.widget(): item.widget().deleteLater()
+
+        projects  = u_load(PROJECTS_FILE, self.user)
+        sales     = u_load(SALES_FILE, self.user)
+        expenses  = u_load(EXPENSES_FILE, self.user)
+        customers = u_load(CUSTOMERS_FILE, self.user)
+        stock     = load_json(STOCK_FILE, {})
+        settings  = get_settings()
+        threshold = settings.get("low_stock_threshold", 500)
+
+        t_mal   = sum(p.get("toplam_maliyet", 0) for p in projects)
+        t_satis = sum(s.get("satis_fiyati", 0) for s in sales)
+        t_gider = sum(e.get("tutar", 0) for e in expenses)
+        net_kar = t_satis - t_mal - t_gider
+        t_stok  = sum(stock.values())
+        dusuk   = sum(1 for v in stock.values() if 0 < v < threshold)
+        tasks   = u_load(TASKS_FILE, self.user)
+        bekleyen_task = sum(1 for t in tasks if t.get("durum") != "✅ Tamamlandı")
+
+        # KPI Row 1
+        row1 = QHBoxLayout(); row1.setSpacing(8)
+        for icon, label, val, col in [
+            ("📋", "Proje", str(len(projects)), SM.t("text")),
+            ("💸", "Toplam Maliyet", f"{t_mal:,.2f} TL", SM.t("text_dim")),
+            ("🛒", "Toplam Satış", f"{t_satis:,.2f} TL", SM.t("success")),
+            ("✅", "Net Kar", f"{net_kar:,.2f} TL", SM.t("success") if net_kar >= 0 else SM.t("danger")),
+            ("📤", "Giderler", f"{t_gider:,.2f} TL", SM.t("danger")),
+        ]:
+            row1.addWidget(KPICard(icon, label, val, col))
+        self.cl.addLayout(row1)
+
+        # KPI Row 2
+        row2 = QHBoxLayout(); row2.setSpacing(8)
+        for icon, label, val, col in [
+            ("📦", "Toplam Stok", f"{t_stok:,.0f} g", SM.t("accent")),
+            ("⚠️", "Düşük Stok", f"{dusuk} ürün", SM.t("warning") if dusuk else SM.t("success")),
+            ("👥", "Müşteri", str(len(customers)), SM.t("accent2")),
+            ("🛍️", "Satış Adedi", str(len(sales)), SM.t("text")),
+            ("✅", "Bekleyen Görev", str(bekleyen_task), SM.t("warning") if bekleyen_task else SM.t("success")),
+        ]:
+            row2.addWidget(KPICard(icon, label, val, col))
+        self.cl.addLayout(row2)
+
+        # Grafikler
+        chart_row = QHBoxLayout(); chart_row.setSpacing(8)
+        fil_card = CardFrame()
+        fil_l = QVBoxLayout(fil_card); fil_l.setContentsMargins(16, 12, 16, 12)
+        hdr = QLabel("🧵 Filament Kullanımı")
+        hdr.setFont(QFont("Courier New", 12, QFont.Weight.Bold))
+        hdr.setStyleSheet(f"color: {SM.t('accent')}; border: none;")
+        fil_l.addWidget(hdr)
+        fil_use = {}
+        for p in projects:
+            f = p.get("filament_turu", "PLA")
+            fil_use[f] = fil_use.get(f, 0) + p.get("gram", 0)
+        if fil_use:
+            bc = BarChart(fil_use, SM.t("accent")); bc.setMinimumHeight(120)
+            fil_l.addWidget(bc)
+        else:
+            fil_l.addWidget(QLabel("Henüz veri yok."))
+
+        donut_card = CardFrame(); donut_card.setFixedWidth(200)
+        donut_l = QVBoxLayout(donut_card); donut_l.setContentsMargins(16, 12, 16, 12)
+        dh = QLabel("📊 Ödeme Dağılımı")
+        dh.setFont(QFont("Courier New", 12, QFont.Weight.Bold))
+        dh.setStyleSheet(f"color: {SM.t('accent')}; border: none;")
+        donut_l.addWidget(dh)
+        pay_data = {}
+        for s in sales:
+            pm = s.get("odeme", "Nakit")
+            pay_data[pm] = pay_data.get(pm, 0) + 1
+        if pay_data:
+            dc = DonutChart(pay_data, 160); dc.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            donut_l.addWidget(dc)
+        else:
+            donut_l.addWidget(QLabel("Satış yok."))
+
+        chart_row.addWidget(fil_card, stretch=2)
+        chart_row.addWidget(donut_card)
+        self.cl.addLayout(chart_row)
+
+        # Bu ay özeti
+        now = datetime.now()
+        this_m = f"{now.month:02d}.{now.year}"
+        def in_m(x):
+            try: return x.get("tarih","")[3:10] == this_m
+            except: return False
+
+        m_sal = [s for s in sales if in_m(s)]
+        m_exp = [e for e in expenses if in_m(e)]
+        m_prj = [p for p in projects if in_m(p)]
+
+        self.cl.addWidget(SectionHeader(f"📅 {now.strftime('%B %Y')} Özeti"))
+        month_row = QHBoxLayout(); month_row.setSpacing(8)
+        for icon, label, val, col in [
+            ("📋", "Yeni Proje", str(len(m_prj)), SM.t("accent")),
+            ("💰", "Satış Geliri", f"{sum(s.get('satis_fiyati',0) for s in m_sal):,.2f} TL", SM.t("success")),
+            ("📤", "Giderler", f"{sum(e.get('tutar',0) for e in m_exp):,.2f} TL", SM.t("danger")),
+            ("🛍️", "Satış Adedi", str(len(m_sal)), SM.t("text")),
+        ]:
+            month_row.addWidget(KPICard(icon, label, val, col))
+        self.cl.addLayout(month_row)
+
+        # Alt satır
+        bottom_row = QHBoxLayout(); bottom_row.setSpacing(8)
+        alert_card = CardFrame()
+        alert_l = QVBoxLayout(alert_card); alert_l.setContentsMargins(16, 12, 16, 12)
+        ah = QLabel("⚠️ Stok Uyarıları")
+        ah.setFont(QFont("Courier New", 12, QFont.Weight.Bold))
+        ah.setStyleSheet(f"color: {SM.t('warning')}; border: none;")
+        alert_l.addWidget(ah)
+        low_items = [(k, v) for k, v in stock.items() if 0 < v < threshold]
+        if low_items:
+            for k, v in low_items[:8]:
+                lbl = QLabel(f"⚠️ {k}: {v:.0f} g")
+                lbl.setStyleSheet(f"color: {SM.t('warning')}; border: none;")
+                alert_l.addWidget(lbl)
+        else:
+            ok_lbl = QLabel("✅ Tüm stoklar yeterli.")
+            ok_lbl.setStyleSheet(f"color: {SM.t('success')}; border: none;")
+            alert_l.addWidget(ok_lbl)
+
+        recent_card = CardFrame()
+        recent_l = QVBoxLayout(recent_card); recent_l.setContentsMargins(16, 12, 16, 12)
+        rh = QLabel("💰 Son Satışlar")
+        rh.setFont(QFont("Courier New", 12, QFont.Weight.Bold))
+        rh.setStyleSheet(f"color: {SM.t('accent')}; border: none;")
+        recent_l.addWidget(rh)
+        for s in list(reversed(sales))[:6]:
+            sl = QLabel(f"• {s.get('urun','–')} → {s.get('satis_fiyati',0):.2f} TL  ({s.get('tarih','')[:10]})")
+            sl.setStyleSheet(f"color: {SM.t('text')}; font-size: 12px; border: none;")
+            recent_l.addWidget(sl)
+
+        bottom_row.addWidget(alert_card)
+        bottom_row.addWidget(recent_card)
+        self.cl.addLayout(bottom_row)
+        self.cl.addStretch()
+
+    def refresh(self):
+        self._refresh()
+
+
+# ═══════════════════════════════════════════════════════════════
+#  PROJELER
+# ═══════════════════════════════════════════════════════════════
+class ProjectsPage(QWidget):
+    def __init__(self, user, parent=None):
+        super().__init__(parent)
+        self.user = user
+        self.displayed_projects = []
+        self.all_projects = []
+        self._build_ui()
+        self._refresh_list()
+
+    def _build_ui(self):
+        main = QHBoxLayout(self)
+        main.setContentsMargins(16, 16, 16, 16)
+        main.setSpacing(12)
+
+        form_scroll = QScrollArea()
+        form_scroll.setWidgetResizable(True)
+        form_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        form_scroll.setFixedWidth(390)
+        fw = QWidget()
+        fl = QVBoxLayout(fw)
+        fl.setContentsMargins(0, 0, 8, 0)
+        fl.setSpacing(8)
+        form_scroll.setWidget(fw)
+
+        form_card = CardFrame()
+        fc = QVBoxLayout(form_card)
+        fc.setContentsMargins(20, 16, 20, 16)
+        fc.setSpacing(8)
+
+        title = QLabel("➕  YENİ PROJE")
+        title.setFont(QFont("Courier New", 15, QFont.Weight.Bold))
+        title.setStyleSheet(f"color: {SM.t('accent')}; border: none;")
+        fc.addWidget(title)
+
+        self.e_model   = QLineEdit(); self.e_model.setPlaceholderText("Model adı *"); self.e_model.setMinimumHeight(38)
+        self.e_cat     = QLineEdit(); self.e_cat.setPlaceholderText("Kategori *"); self.e_cat.setMinimumHeight(38)
+        self.e_color   = QLineEdit(); self.e_color.setPlaceholderText("Renk *"); self.e_color.setMinimumHeight(38)
+        self.e_gram    = QLineEdit(); self.e_gram.setPlaceholderText("Gram *"); self.e_gram.setMinimumHeight(38)
+        self.e_hours   = QLineEdit(); self.e_hours.setPlaceholderText("Baskı süresi (saat)"); self.e_hours.setText("0"); self.e_hours.setMinimumHeight(38)
+        self.e_note    = QLineEdit(); self.e_note.setPlaceholderText("Not"); self.e_note.setMinimumHeight(38)
+        self.e_infill  = QLineEdit(); self.e_infill.setPlaceholderText("Dolgu % (örn: 20)"); self.e_infill.setText("20"); self.e_infill.setMinimumHeight(38)
+        self.e_layer   = QLineEdit(); self.e_layer.setPlaceholderText("Katman kalınlığı mm"); self.e_layer.setText("0.2"); self.e_layer.setMinimumHeight(38)
+        self.e_support = QLineEdit(); self.e_support.setPlaceholderText("Destek gram (0=yok)"); self.e_support.setText("0"); self.e_support.setMinimumHeight(38)
+        self.e_postpro = QLineEdit(); self.e_postpro.setPlaceholderText("Post-process maliyet TL"); self.e_postpro.setText("0"); self.e_postpro.setMinimumHeight(38)
+
+        for w in [self.e_model, self.e_cat, self.e_color, self.e_gram, self.e_hours,
+                  self.e_note, self.e_infill, self.e_layer, self.e_support, self.e_postpro]:
+            fc.addWidget(w)
+
+        fc.addWidget(self._label("Filament Türü"))
+        self.cb_filament = QComboBox(); self.cb_filament.setMinimumHeight(38)
+        self.cb_filament.addItems(sorted(FILAMENT_DATA.keys()))
+        fc.addWidget(self.cb_filament)
+
+        fc.addWidget(self._label("Yazıcı Markası"))
+        self.cb_brand = QComboBox(); self.cb_brand.setMinimumHeight(38)
+        self.cb_brand.addItems(sorted(PRINTER_DATA.keys()))
+        self.cb_brand.currentTextChanged.connect(self._update_model_combo)
+        fc.addWidget(self.cb_brand)
+
+        fc.addWidget(self._label("Yazıcı Modeli"))
+        self.cb_model_p = QComboBox(); self.cb_model_p.setMinimumHeight(38)
+        fc.addWidget(self.cb_model_p)
+        self._update_model_combo("Bambu Lab")
+
+        fc.addWidget(self._label("Proje Durumu"))
+        self.cb_status = QComboBox(); self.cb_status.setMinimumHeight(38)
+        self.cb_status.addItems(["⏳ Hazırlanıyor","🔄 Basılıyor","✅ Tamamlandı","❌ İptal","📦 Teslim Edildi"])
+        fc.addWidget(self.cb_status)
+
+        fc.addWidget(self._label("Öncelik"))
+        self.cb_priority = QComboBox(); self.cb_priority.setMinimumHeight(38)
+        self.cb_priority.addItems(["🟢 Normal","🟡 Yüksek","🔴 Acil"])
+        fc.addWidget(self.cb_priority)
+
+        fc.addWidget(self._label("Etiket"))
+        self.cb_tag = QComboBox(); self.cb_tag.setMinimumHeight(38)
+        self.cb_tag.addItems(["Genel","Oyuncak","Endüstriyel","Ev Dekor","Prototip","Sanat","Yedek Parça","Diğer"])
+        fc.addWidget(self.cb_tag)
+
+        fc.addWidget(self._label("Kar Marjı"))
+        marj_row = QHBoxLayout()
+        self.cb_marj = QComboBox(); self.cb_marj.setMinimumHeight(38)
+        self.cb_marj.addItems(["Düşük (%20)","Normal (%40)","Yüksek (%60)","Premium (%80)"])
+        marj_row.addWidget(self.cb_marj)
+        calc_btn = StyledButton("⚡ Hesapla", "warning")
+        calc_btn.clicked.connect(self._calc_price)
+        marj_row.addWidget(calc_btn)
+        fc.addLayout(marj_row)
+
+        self.lbl_calc = QLabel("")
+        self.lbl_calc.setStyleSheet(f"color: {SM.t('warning')}; font-weight: bold; border: none;")
+        self.lbl_calc.setWordWrap(True)
+        fc.addWidget(self.lbl_calc)
+
+        btn_row = QHBoxLayout()
+        save_btn = StyledButton("💾 Kaydet")
+        save_btn.clicked.connect(self._add_project)
+        tmpl_btn = StyledButton("📋 Şablon", "flat")
+        tmpl_btn.clicked.connect(self._save_template)
+        btn_row.addWidget(save_btn); btn_row.addWidget(tmpl_btn)
+        fc.addLayout(btn_row)
+
+        self.info_lbl = QLabel("")
+        self.info_lbl.setWordWrap(True)
+        self.info_lbl.setStyleSheet(f"color: {SM.t('success')}; border: none;")
+        fc.addWidget(self.info_lbl)
+        fc.addStretch()
+
+        fl.addWidget(form_card)
+        fl.addStretch()
+        main.addWidget(form_scroll)
+
+        # Sağ: liste
+        right = QWidget()
+        rl = QVBoxLayout(right)
+        rl.setContentsMargins(0, 0, 0, 0)
+        rl.setSpacing(8)
+
+        tool_bar = QHBoxLayout(); tool_bar.setSpacing(6)
+        self.search_input = QLineEdit()
+        self.search_input.setPlaceholderText("🔍 Ara (model, kategori, filament...)")
+        self.search_input.setMinimumHeight(38)
+        self.search_input.textChanged.connect(self._filter_table)
+        self.cb_filter_status = QComboBox(); self.cb_filter_status.setMinimumHeight(38)
+        self.cb_filter_status.addItems(["Tümü","⏳ Hazırlanıyor","🔄 Basılıyor","✅ Tamamlandı","❌ İptal"])
+        self.cb_filter_status.currentTextChanged.connect(self._filter_table)
+        self.cb_sort = QComboBox(); self.cb_sort.setMinimumHeight(38)
+        self.cb_sort.addItems(["Tarihe Göre (Yeni)","Tarihe Göre (Eski)","Maliyete Göre","Grama Göre"])
+        self.cb_sort.currentTextChanged.connect(self._filter_table)
+        tool_bar.addWidget(self.search_input, stretch=2)
+        tool_bar.addWidget(self.cb_filter_status)
+        tool_bar.addWidget(self.cb_sort)
+        rl.addLayout(tool_bar)
+
+        btn_bar = QHBoxLayout(); btn_bar.setSpacing(6)
+        for text, func, style in [
+            ("📋 Yükle", self._load_to_form, "flat"),
+            ("✏️ Güncelle", self._update_project, "success"),
+            ("📄 Kopyala", self._copy_project, "flat"),
+            ("📄 PDF Fatura", self._gen_invoice, "warning"),
+            ("🗑 Sil", self._del_project, "danger"),
+            ("📥 CSV", self._export_csv, "flat"),
+        ]:
+            btn = StyledButton(text, style); btn.setMinimumHeight(36); btn.clicked.connect(func); btn_bar.addWidget(btn)
+        rl.addLayout(btn_bar)
+
+        self.table = QTableWidget()
+        self.table.setColumnCount(12)
+        self.table.setHorizontalHeaderLabels([
+            "#","Model","Kategori","Filament","Gram","Süre (h)",
+            "F.Maliyet","E.Maliyet","TOPLAM","Durum","Öncelik","Tarih"
+        ])
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.table.setAlternatingRowColors(True)
+        self.table.setSortingEnabled(True)
+        self.table.setMinimumHeight(400)
+        rl.addWidget(self.table)
+
+        self.sel_input = QLineEdit()
+        self.sel_input.setPlaceholderText("İşlem yapılacak proje no (veya tabloda seç)")
+        self.sel_input.setMinimumHeight(36)
+        rl.addWidget(self.sel_input)
+        main.addWidget(right)
+
+    def _label(self, txt):
+        l = QLabel(txt)
+        l.setStyleSheet(f"color: {SM.t('text_dim')}; font-size: 12px; border: none;")
+        return l
+
+    def _update_model_combo(self, brand=None):
+        brand = brand or self.cb_brand.currentText()
+        models = list(PRINTER_DATA.get(brand, {}).keys())
+        self.cb_model_p.clear()
+        self.cb_model_p.addItems(models or ["Model Yok"])
+
+    def _calc_price(self):
+        try:
+            gram    = float(self.e_gram.text().replace(",",".") or "0")
+            hrs     = float(self.e_hours.text().replace(",",".") or "0")
+            fil     = self.cb_filament.currentText()
+            brand   = self.cb_brand.currentText()
+            model   = self.cb_model_p.currentText()
+            support = float(self.e_support.text().replace(",",".") or "0")
+            postpro = float(self.e_postpro.text().replace(",",".") or "0")
+            total, fmal, emal, watt, etuk = calc_cost(gram, fil, hrs, brand, model)
+            total_full = total + postpro
+            marj_map = {"Düşük (%20)": 0.20,"Normal (%40)": 0.40,"Yüksek (%60)": 0.60,"Premium (%80)": 0.80}
+            marj = marj_map.get(self.cb_marj.currentText(), 0.40)
+            oneri = round(total_full * (1 + marj), 2)
+            kdv_r = get_settings().get("kdv_rate", 20)
+            kdvli = round(oneri * (1 + kdv_r / 100), 2)
+            self.lbl_calc.setText(
+                f"Filament: {fmal:.2f} TL  +  Elektrik: {emal:.2f} TL\n"
+                f"Post-process: {postpro:.2f} TL  →  Maliyet: {total_full:.2f} TL\n"
+                f"Önerilen Satış: {oneri:.2f} TL  |  KDV'li: {kdvli:.2f} TL"
+            )
+        except Exception as ex:
+            self.lbl_calc.setText(f"Hata: {ex}")
+
+    def _add_project(self):
+        try:
+            model   = self.e_model.text().strip()
+            kat     = self.e_cat.text().strip()
+            renk    = self.e_color.text().strip()
+            gram    = float(self.e_gram.text().replace(",","."))
+            hrs     = float(self.e_hours.text().replace(",",".") or "0")
+            fil     = self.cb_filament.currentText()
+            brand   = self.cb_brand.currentText()
+            model_p = self.cb_model_p.currentText()
+            support = float(self.e_support.text().replace(",",".") or "0")
+            postpro = float(self.e_postpro.text().replace(",",".") or "0")
+
+            if not model or not kat or not renk:
+                self.info_lbl.setStyleSheet(f"color: {SM.t('danger')}; border: none;")
+                self.info_lbl.setText("✗ Model, kategori ve renk zorunlu."); return
+
+            stock = load_json(STOCK_FILE, {})
+            toplam_gram = gram + support
+            if stock.get(fil, 0) < toplam_gram:
+                self.info_lbl.setStyleSheet(f"color: {SM.t('danger')}; border: none;")
+                self.info_lbl.setText(f"✗ Yeterli {fil} yok! Mevcut: {stock.get(fil,0):.0f} g"); return
+
+            stock[fil] = stock.get(fil, 0) - toplam_gram
+            save_json(STOCK_FILE, stock)
+
+            total, fmal, emal, watt, etuk = calc_cost(gram, fil, hrs, brand, model_p)
+            total_full = total + postpro
+
+            prj = {
+                "owner": self.user, "model_adi": model.title(),
+                "kategori": kat.title(), "filament_turu": fil,
+                "yazici_marka": brand, "yazici_model": model_p,
+                "watt": watt, "renk": renk.title(), "gram": gram,
+                "destek_gram": support, "sure": hrs,
+                "dolgu": float(self.e_infill.text() or "20"),
+                "katman": float(self.e_layer.text() or "0.2"),
+                "filament_maliyet": fmal, "elektrik_maliyet": emal,
+                "post_process": postpro, "toplam_maliyet": total_full,
+                "durum": self.cb_status.currentText(),
+                "oncelik": self.cb_priority.currentText(),
+                "etiket": self.cb_tag.currentText(),
+                "not": self.e_note.text().strip(),
+                "tarih": datetime.now().strftime("%d.%m.%Y %H:%M"),
+                "favori": False,
+            }
+            projects = u_load(PROJECTS_FILE, self.user)
+            projects.append(prj)
+            u_save(PROJECTS_FILE, self.user, projects)
+            log_activity(self.user, "PROJE EKLENDİ", model)
+            self.info_lbl.setStyleSheet(f"color: {SM.t('success')}; border: none;")
+            self.info_lbl.setText(f"✓ {model.title()} eklendi. Toplam: {total_full:.2f} TL")
+            self._clear_form()
+            self._refresh_list()
+        except ValueError as ex:
+            self.info_lbl.setStyleSheet(f"color: {SM.t('danger')}; border: none;")
+            self.info_lbl.setText(f"✗ {ex}")
+
+    def _clear_form(self):
+        for e in [self.e_model, self.e_cat, self.e_color, self.e_gram, self.e_note]:
+            e.clear()
+        self.e_hours.setText("0"); self.e_infill.setText("20")
+        self.e_layer.setText("0.2"); self.e_support.setText("0"); self.e_postpro.setText("0")
+
+    def _save_template(self):
+        name, ok = QInputDialog.getText(self, "Şablon", "Şablon adı:")
+        if not ok or not name.strip(): return
+        templates = load_json(TEMPLATES_FILE, [])
+        templates.append({
+            "isim": name.strip(), "owner": self.user,
+            "filament": self.cb_filament.currentText(),
+            "brand": self.cb_brand.currentText(),
+            "model": self.cb_model_p.currentText(),
+            "infill": self.e_infill.text(), "layer": self.e_layer.text(),
+            "durum": self.cb_status.currentText(),
+            "tarih": datetime.now().strftime("%d.%m.%Y"),
+        })
+        save_json(TEMPLATES_FILE, templates)
+        QMessageBox.information(self, "Şablon", f"'{name}' kaydedildi.")
+
+    def _gen_invoice(self):
+        """Seçili proje için PDF fatura oluştur"""
+        idx = self._get_selected_idx()
+        if idx < 0 or idx >= len(self.displayed_projects):
+            QMessageBox.warning(self, "Hata", "Proje seçin."); return
+        p = self.displayed_projects[idx]
+        if not PDF_OK:
+            QMessageBox.warning(self, "Hata", "reportlab kurulu değil.\npip install reportlab")
+            return
+        path, _ = QFileDialog.getSaveFileName(self, "PDF Kaydet",
+            f"fatura_{p.get('model_adi','proje')}_{datetime.now().strftime('%Y%m%d')}.pdf", "PDF (*.pdf)")
+        if not path: return
+        try:
+            settings = get_settings()
+            doc = SimpleDocTemplate(path, pagesize=A4)
+            styles = getSampleStyleSheet()
+            story = []
+            story.append(Paragraph(f"<b>{settings.get('company_name','3D Atölye')}</b>", styles['Title']))
+            story.append(Spacer(1, 0.3*cm))
+            story.append(Paragraph(f"Tarih: {datetime.now().strftime('%d.%m.%Y')}", styles['Normal']))
+            story.append(Paragraph(f"Fatura No: #{random.randint(1000,9999)}", styles['Normal']))
+            story.append(Spacer(1, 0.5*cm))
+            data = [
+                ["Ürün/Hizmet", "Detay"],
+                ["Model Adı", p.get("model_adi","")],
+                ["Filament", p.get("filament_turu","")],
+                ["Gram", f"{p.get('gram',0):.0f} g"],
+                ["Baskı Süresi", f"{p.get('sure',0):.1f} saat"],
+                ["Filament Maliyeti", f"{p.get('filament_maliyet',0):.2f} TL"],
+                ["Elektrik Maliyeti", f"{p.get('elektrik_maliyet',0):.2f} TL"],
+                ["Post-Process", f"{p.get('post_process',0):.2f} TL"],
+                ["TOPLAM MALİYET", f"{p.get('toplam_maliyet',0):.2f} TL"],
+            ]
+            t = Table(data, colWidths=[8*cm, 8*cm])
+            t.setStyle(TableStyle([
+                ('BACKGROUND', (0,0), (-1,0), rl_colors.HexColor('#21262D')),
+                ('TEXTCOLOR', (0,0), (-1,0), rl_colors.white),
+                ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+                ('GRID', (0,0), (-1,-1), 0.5, rl_colors.grey),
+                ('BACKGROUND', (0,-1), (-1,-1), rl_colors.HexColor('#00D4FF')),
+                ('FONTNAME', (0,-1), (-1,-1), 'Helvetica-Bold'),
+            ]))
+            story.append(t)
+            doc.build(story)
+            QMessageBox.information(self, "Fatura", f"PDF oluşturuldu:\n{path}")
+        except Exception as ex:
+            QMessageBox.warning(self, "Hata", str(ex))
+
+    def _refresh_list(self):
+        self.all_projects = u_load(PROJECTS_FILE, self.user)
+        self._filter_table()
+
+    def _filter_table(self):
+        kw = self.search_input.text().strip().lower()
+        sf = self.cb_filter_status.currentText()
+        so = self.cb_sort.currentText()
+        filtered = self.all_projects
+        if kw:
+            filtered = [p for p in filtered if kw in f"{p.get('model_adi','')} {p.get('kategori','')} {p.get('filament_turu','')} {p.get('etiket','')}".lower()]
+        if sf != "Tümü":
+            filtered = [p for p in filtered if p.get("durum","") == sf]
+        if so == "Tarihe Göre (Yeni)":
+            filtered = sorted(filtered, key=lambda x: x.get("tarih",""), reverse=True)
+        elif so == "Tarihe Göre (Eski)":
+            filtered = sorted(filtered, key=lambda x: x.get("tarih",""))
+        elif so == "Maliyete Göre":
+            filtered = sorted(filtered, key=lambda x: x.get("toplam_maliyet",0), reverse=True)
+        elif so == "Grama Göre":
+            filtered = sorted(filtered, key=lambda x: x.get("gram",0), reverse=True)
+
+        self.table.setRowCount(len(filtered))
+        for i, p in enumerate(filtered):
+            row_data = [
+                str(i+1), p.get("model_adi",""), p.get("kategori",""),
+                p.get("filament_turu",""), f"{p.get('gram',0):.0f}",
+                f"{p.get('sure',0):.1f}",
+                f"{p.get('filament_maliyet',0):.2f} TL",
+                f"{p.get('elektrik_maliyet',0):.2f} TL",
+                f"{p.get('toplam_maliyet',0):.2f} TL",
+                p.get("durum",""), p.get("oncelik",""), p.get("tarih","")[:10],
+            ]
+            for j, val in enumerate(row_data):
+                item = QTableWidgetItem(val)
+                item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+                durum = p.get("durum","")
+                if "Tamamlandı" in durum: item.setForeground(QColor(SM.t("success")))
+                elif "İptal" in durum: item.setForeground(QColor(SM.t("danger")))
+                elif "Basılıyor" in durum: item.setForeground(QColor(SM.t("warning")))
+                self.table.setItem(i, j, item)
+        self.displayed_projects = filtered
+
+    def _get_selected_idx(self):
+        rows = self.table.selectedItems()
+        if rows: return self.table.row(rows[0])
+        try: return int(self.sel_input.text().strip()) - 1
+        except: return -1
+
+    def _load_to_form(self):
+        idx = self._get_selected_idx()
+        if idx < 0 or idx >= len(self.displayed_projects):
+            QMessageBox.warning(self, "Hata", "Geçerli bir proje seçin."); return
+        p = self.displayed_projects[idx]
+        self.e_model.setText(p.get("model_adi",""))
+        self.e_cat.setText(p.get("kategori",""))
+        self.e_color.setText(p.get("renk",""))
+        self.e_gram.setText(str(p.get("gram","")))
+        self.e_hours.setText(str(p.get("sure","0")))
+        self.e_note.setText(p.get("not",""))
+        self.e_infill.setText(str(p.get("dolgu","20")))
+        self.e_layer.setText(str(p.get("katman","0.2")))
+        self.e_support.setText(str(p.get("destek_gram","0")))
+        self.e_postpro.setText(str(p.get("post_process","0")))
+        for cb, key in [(self.cb_filament,"filament_turu"),(self.cb_brand,"yazici_marka"),
+                        (self.cb_status,"durum"),(self.cb_priority,"oncelik")]:
+            i = cb.findText(p.get(key,""))
+            if i >= 0: cb.setCurrentIndex(i)
+        self._update_model_combo(p.get("yazici_marka",""))
+        im = self.cb_model_p.findText(p.get("yazici_model",""))
+        if im >= 0: self.cb_model_p.setCurrentIndex(im)
+        self.info_lbl.setText("✓ Proje forma yüklendi.")
+
+    def _update_project(self):
+        idx = self._get_selected_idx()
+        if idx < 0 or idx >= len(self.displayed_projects):
+            QMessageBox.warning(self, "Hata", "Proje seçin."); return
+        target = self.displayed_projects[idx]
+        all_p = u_load(PROJECTS_FILE, self.user)
+        real_idx = next((i for i,p in enumerate(all_p)
+            if p.get("tarih")==target.get("tarih") and p.get("model_adi")==target.get("model_adi")), -1)
+        if real_idx < 0: QMessageBox.warning(self, "Hata", "Bulunamadı."); return
+        try:
+            gram    = float(self.e_gram.text().replace(",",".") or str(all_p[real_idx].get("gram",0)))
+            hrs     = float(self.e_hours.text().replace(",",".") or "0")
+            fil     = self.cb_filament.currentText()
+            brand   = self.cb_brand.currentText()
+            model_p = self.cb_model_p.currentText()
+            support = float(self.e_support.text().replace(",",".") or "0")
+            postpro = float(self.e_postpro.text().replace(",",".") or "0")
+            stock = load_json(STOCK_FILE, {})
+            old_fil = all_p[real_idx].get("filament_turu","")
+            old_gram= all_p[real_idx].get("gram",0)+all_p[real_idx].get("destek_gram",0)
+            stock[old_fil] = stock.get(old_fil,0)+old_gram
+            toplam_gram = gram+support
+            if stock.get(fil,0) < toplam_gram:
+                QMessageBox.warning(self,"Stok",f"Yeterli {fil} yok!"); return
+            stock[fil] = stock.get(fil,0)-toplam_gram
+            save_json(STOCK_FILE, stock)
+            total,fmal,emal,watt,_ = calc_cost(gram,fil,hrs,brand,model_p)
+            all_p[real_idx].update({
+                "model_adi": self.e_model.text().strip().title() or all_p[real_idx]["model_adi"],
+                "kategori": self.e_cat.text().strip().title() or all_p[real_idx]["kategori"],
+                "renk": self.e_color.text().strip().title() or all_p[real_idx]["renk"],
+                "gram": gram, "sure": hrs, "filament_turu": fil,
+                "yazici_marka": brand, "yazici_model": model_p,
+                "destek_gram": support, "post_process": postpro,
+                "filament_maliyet": fmal, "elektrik_maliyet": emal,
+                "toplam_maliyet": total+postpro, "watt": watt,
+                "durum": self.cb_status.currentText(),
+                "oncelik": self.cb_priority.currentText(),
+                "not": self.e_note.text().strip(),
+                "tarih": datetime.now().strftime("%d.%m.%Y %H:%M"),
+            })
+            u_save(PROJECTS_FILE, self.user, all_p)
+            log_activity(self.user,"PROJE GÜNCELLENDİ",all_p[real_idx]["model_adi"])
+            self._refresh_list()
+            QMessageBox.information(self,"Başarılı","Proje güncellendi.")
+        except ValueError as ex:
+            QMessageBox.warning(self,"Hata",str(ex))
+
+    def _copy_project(self):
+        idx = self._get_selected_idx()
+        if idx < 0 or idx >= len(self.displayed_projects): return
+        p = dict(self.displayed_projects[idx])
+        p["model_adi"] = p.get("model_adi","") + " (Kopya)"
+        p["tarih"] = datetime.now().strftime("%d.%m.%Y %H:%M")
+        all_p = u_load(PROJECTS_FILE, self.user)
+        all_p.append(p)
+        u_save(PROJECTS_FILE, self.user, all_p)
+        self._refresh_list()
+
+    def _del_project(self):
+        idx = self._get_selected_idx()
+        if idx < 0 or idx >= len(self.displayed_projects): return
+        target = self.displayed_projects[idx]
+        if QMessageBox.question(self,"Onay",f"'{target.get('model_adi','')}' silinsin mi?",
+            QMessageBox.StandardButton.Yes|QMessageBox.StandardButton.No) != QMessageBox.StandardButton.Yes: return
+        all_p = u_load(PROJECTS_FILE, self.user)
+        real_idx = next((i for i,p in enumerate(all_p)
+            if p.get("tarih")==target.get("tarih") and p.get("model_adi")==target.get("model_adi")), -1)
+        if real_idx >= 0:
+            removed = all_p.pop(real_idx)
+            stock = load_json(STOCK_FILE, {})
+            fil = removed.get("filament_turu","")
+            stock[fil] = stock.get(fil,0)+removed.get("gram",0)+removed.get("destek_gram",0)
+            save_json(STOCK_FILE, stock)
+            u_save(PROJECTS_FILE, self.user, all_p)
+            log_activity(self.user,"PROJE SİLİNDİ",removed.get("model_adi",""))
+        self._refresh_list()
+
+    def _export_csv(self):
+        path, _ = QFileDialog.getSaveFileName(self,"CSV Kaydet",
+            f"projeler_{datetime.now().strftime('%Y%m%d')}.csv","CSV (*.csv)")
+        if not path: return
+        with open(path,"w",encoding="utf-8-sig",newline="") as f:
+            w = csv.writer(f)
+            w.writerow(["Model","Kategori","Filament","Gram","Süre","F.Maliyet","E.Maliyet","Toplam","Durum","Tarih"])
+            for p in u_load(PROJECTS_FILE, self.user):
+                w.writerow([p.get("model_adi",""),p.get("kategori",""),p.get("filament_turu",""),
+                            p.get("gram",0),p.get("sure",0),p.get("filament_maliyet",0),
+                            p.get("elektrik_maliyet",0),p.get("toplam_maliyet",0),p.get("durum",""),p.get("tarih","")])
+        QMessageBox.information(self,"CSV",f"Kaydedildi:\n{path}")
+
+    def refresh(self):
+        self._refresh_list()
+
+
+# ═══════════════════════════════════════════════════════════════
+#  STOK TAKİBİ (orijinalden korundu + küçük iyileştirmeler)
+# ═══════════════════════════════════════════════════════════════
+class StockPage(QWidget):
+    def __init__(self, user, parent=None):
+        super().__init__(parent)
+        self.user = user
+        self._build_ui()
+        self._refresh()
+
+    def _build_ui(self):
+        main = QHBoxLayout(self)
+        main.setContentsMargins(16,16,16,16)
+        main.setSpacing(12)
+
+        left = CardFrame(); left.setFixedWidth(340)
+        ll = QVBoxLayout(left); ll.setContentsMargins(20,16,20,16); ll.setSpacing(8)
+
+        hl = QLabel("📦 STOK İŞLEMİ")
+        hl.setFont(QFont("Courier New",14,QFont.Weight.Bold))
+        hl.setStyleSheet(f"color: {SM.t('accent')}; border: none;")
+        ll.addWidget(hl)
+
+        self.cb_fil = QComboBox(); self.cb_fil.setMinimumHeight(38)
+        self.cb_fil.addItems(sorted(FILAMENT_DATA.keys()))
+        ll.addWidget(QLabel("Filament Seç:")); ll.addWidget(self.cb_fil)
+
+        self.e_amount = QLineEdit(); self.e_amount.setPlaceholderText("Gram (+ ekle, - çıkar)"); self.e_amount.setMinimumHeight(38)
+        self.e_stk_note = QLineEdit(); self.e_stk_note.setPlaceholderText("Açıklama"); self.e_stk_note.setMinimumHeight(38)
+        ll.addWidget(self.e_amount); ll.addWidget(self.e_stk_note)
+
+        for text, func, style in [
+            ("➕ Ekle / Çıkar", self._update_stock, "primary"),
+            ("↩ Seçileni Sıfırla", self._reset_stock, "danger"),
+            ("📦 Toplu Ekle", self._bulk_add, "flat"),
+        ]:
+            btn = StyledButton(text, style); btn.clicked.connect(func); ll.addWidget(btn)
+
+        self.stk_info = QLabel("")
+        self.stk_info.setWordWrap(True)
+        self.stk_info.setStyleSheet(f"color: {SM.t('success')}; border: none;")
+        ll.addWidget(self.stk_info)
+
+        sep = QFrame(); sep.setFrameShape(QFrame.Shape.HLine)
+        ll.addWidget(sep)
+        ll.addWidget(QLabel("⚠️ Düşük Stok Eşiği (g):"))
+        self.e_threshold = QLineEdit()
+        self.e_threshold.setText(str(int(get_settings().get("low_stock_threshold",500))))
+        self.e_threshold.setMinimumHeight(38)
+        ll.addWidget(self.e_threshold)
+        save_thr = StyledButton("💾 Eşiği Kaydet","warning")
+        save_thr.clicked.connect(self._save_threshold); ll.addWidget(save_thr)
+
+        sep2 = QFrame(); sep2.setFrameShape(QFrame.Shape.HLine); ll.addWidget(sep2)
+        for text,func in [("📥 CSV Dışa Aktar",self._export_csv),("📤 CSV İçe Aktar",self._import_csv)]:
+            btn=StyledButton(text,"flat"); btn.clicked.connect(func); ll.addWidget(btn)
+
+        ll.addWidget(QLabel("📊 Stok Dağılımı:"))
+        self.donut_container = QVBoxLayout(); ll.addLayout(self.donut_container)
+        ll.addStretch()
+        main.addWidget(left)
+
+        right = QWidget()
+        rl = QVBoxLayout(right); rl.setContentsMargins(0,0,0,0); rl.setSpacing(8)
+        hdr = QHBoxLayout()
+        hl2 = QLabel("STOK TABLOSU")
+        hl2.setFont(QFont("Courier New",14,QFont.Weight.Bold))
+        hl2.setStyleSheet(f"color: {SM.t('accent')}; border: none;")
+        hdr.addWidget(hl2); hdr.addStretch()
+        self.cb_filter_cat = QComboBox(); self.cb_filter_cat.setMinimumHeight(36)
+        cats = ["Tümü"] + sorted(set(v["kategori"] for v in FILAMENT_DATA.values()))
+        self.cb_filter_cat.addItems(cats)
+        self.cb_filter_cat.currentTextChanged.connect(self._refresh)
+        hdr.addWidget(self.cb_filter_cat)
+        ref_btn = StyledButton("🔃 Yenile","flat"); ref_btn.clicked.connect(self._refresh); hdr.addWidget(ref_btn)
+        rl.addLayout(hdr)
+
+        self.table = QTableWidget()
+        self.table.setColumnCount(7)
+        self.table.setHorizontalHeaderLabels(["Filament","Kategori","Stok (g)","Birim TL/kg","Değer TL","Bar","Durum"])
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.table.setAlternatingRowColors(True)
+        self.table.setMinimumHeight(500)
+        rl.addWidget(self.table)
+
+        self.summary_lbl = QLabel("")
+        self.summary_lbl.setStyleSheet(f"color: {SM.t('accent')}; font-weight: bold; border: none;")
+        rl.addWidget(self.summary_lbl)
+        main.addWidget(right)
+
+    def _update_stock(self):
+        try:
+            fil = self.cb_fil.currentText()
+            amount = float(self.e_amount.text().replace(",","."))
+            stock = load_json(STOCK_FILE, {})
+            new = stock.get(fil,0)+amount
+            if new < 0:
+                QMessageBox.warning(self,"Hata",f"Stok negatif olamaz! Mevcut: {stock.get(fil,0):.0f} g"); return
+            stock[fil] = new
+            save_json(STOCK_FILE, stock)
+            op = "eklendi" if amount>=0 else "çıkarıldı"
+            self.stk_info.setText(f"✓ {abs(amount):.0f} g {op}. Yeni: {new:.0f} g")
+            log_activity(self.user,"STOK GÜNCELLENDİ",f"{fil}: {amount:+.0f} g")
+            self.e_amount.clear(); self._refresh()
+        except ValueError:
+            QMessageBox.warning(self,"Hata","Geçerli sayı gir.")
+
+    def _reset_stock(self):
+        fil = self.cb_fil.currentText()
+        if QMessageBox.question(self,"Onay",f"{fil} sıfırlansın mı?",
+            QMessageBox.StandardButton.Yes|QMessageBox.StandardButton.No)==QMessageBox.StandardButton.Yes:
+            s = load_json(STOCK_FILE,{}); s[fil]=0; save_json(STOCK_FILE,s); self._refresh()
+
+    def _bulk_add(self):
+        dlg = QDialog(self); dlg.setWindowTitle("Toplu Stok Ekle"); dlg.setMinimumSize(500,400)
+        dlg.setStyleSheet(f"background: {SM.t('bg')}; color: {SM.t('text')};")
+        l = QVBoxLayout(dlg)
+        l.addWidget(QLabel("Her satıra: FilamentAdı,Gram gir\nÖrnek: Bambu PLA,1000"))
+        te = QTextEdit()
+        te.setStyleSheet(f"background: {SM.t('input_bg')}; color: {SM.t('text')}; border: 1px solid {SM.t('border')};")
+        l.addWidget(te)
+        bb = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok|QDialogButtonBox.StandardButton.Cancel)
+        bb.accepted.connect(dlg.accept); bb.rejected.connect(dlg.reject); l.addWidget(bb)
+        if dlg.exec()==QDialog.DialogCode.Accepted:
+            stock = load_json(STOCK_FILE,{})
+            added = 0
+            for line in te.toPlainText().strip().split("\n"):
+                parts = line.strip().split(",")
+                if len(parts)==2:
+                    fn,gs = parts[0].strip(),parts[1].strip()
+                    try:
+                        if fn in FILAMENT_DATA:
+                            stock[fn] = stock.get(fn,0)+float(gs); added+=1
+                    except: pass
+            save_json(STOCK_FILE,stock); self._refresh()
+            QMessageBox.information(self,"Toplu Ekle",f"{added} filament güncellendi.")
+
+    def _save_threshold(self):
+        try:
+            v = float(self.e_threshold.text().strip())
+            s = get_settings(); s["low_stock_threshold"]=v; save_settings(s)
+            self.stk_info.setText(f"✓ Eşik {v:.0f} g kaydedildi."); self._refresh()
+        except: QMessageBox.warning(self,"Hata","Sayı gir.")
+
+    def _refresh(self):
+        stock = load_json(STOCK_FILE,{})
+        threshold = get_settings().get("low_stock_threshold",500)
+        cat_filter = self.cb_filter_cat.currentText() if hasattr(self,"cb_filter_cat") else "Tümü"
+        items = []
+        for fil,data in FILAMENT_DATA.items():
+            if cat_filter!="Tümü" and data["kategori"]!=cat_filter: continue
+            gram=stock.get(fil,0); fiyat=data["fiyat"]; deger=(gram/1000)*fiyat
+            durum = "❌ TÜKENDİ" if gram==0 else ("⚠️ DÜŞÜK" if gram<threshold else "✅ YETERLİ")
+            items.append((fil,data["kategori"],gram,fiyat,deger,durum))
+        self.table.setRowCount(len(items))
+        total_val = 0; nonempty={}
+        for i,(fil,kat,gram,fiyat,deger,durum) in enumerate(items):
+            total_val+=deger
+            if gram>0: nonempty[fil[:10]]=gram
+            bar_len=min(int(gram/500),10); bar="█"*bar_len+"░"*(10-bar_len)
+            for j,val in enumerate([fil,kat,f"{gram:.0f}",f"{fiyat}",f"{deger:.2f}",bar,durum]):
+                item=QTableWidgetItem(val); item.setFlags(item.flags()&~Qt.ItemFlag.ItemIsEditable)
+                if "TÜKENDİ" in durum: item.setForeground(QColor(SM.t("danger")))
+                elif "DÜŞÜK" in durum: item.setForeground(QColor(SM.t("warning")))
+                else: item.setForeground(QColor(SM.t("success")))
+                self.table.setItem(i,j,item)
+        self.summary_lbl.setText(f"Toplam Stok Değeri: {total_val:,.2f} TL  |  {len([x for x in items if x[2]>0])} filament var  |  {len([x for x in items if 0<x[2]<threshold])} düşük")
+        while self.donut_container.count():
+            it=self.donut_container.takeAt(0)
+            if it.widget(): it.widget().deleteLater()
+        top5=dict(sorted(nonempty.items(),key=lambda x:x[1],reverse=True)[:5])
+        if top5:
+            dc=DonutChart(top5,140); self.donut_container.addWidget(dc)
+
+    def _export_csv(self):
+        path,_=QFileDialog.getSaveFileName(self,"CSV Kaydet",f"stok_{datetime.now().strftime('%Y%m%d')}.csv","CSV (*.csv)")
+        if not path: return
+        stock=load_json(STOCK_FILE,{})
+        with open(path,"w",encoding="utf-8-sig",newline="") as f:
+            w=csv.writer(f); w.writerow(["Filament","Kategori","Stok (g)","Birim TL/kg","Değer TL"])
+            for fil,data in FILAMENT_DATA.items():
+                gram=stock.get(fil,0); fiyat=data["fiyat"]
+                w.writerow([fil,data["kategori"],gram,fiyat,round((gram/1000)*fiyat,2)])
+        QMessageBox.information(self,"CSV",f"Kaydedildi:\n{path}")
+
+    def _import_csv(self):
+        path,_=QFileDialog.getOpenFileName(self,"CSV Seç","","CSV (*.csv)")
+        if not path: return
+        stock=load_json(STOCK_FILE,{}); count=0
+        try:
+            with open(path,encoding="utf-8-sig") as f:
+                reader=csv.DictReader(f)
+                for row in reader:
+                    fil=row.get("Filament","").strip()
+                    gram=float(row.get("Stok (g)","0").replace(",",".") or "0")
+                    if fil: stock[fil]=gram; count+=1
+            save_json(STOCK_FILE,stock); self._refresh()
+            QMessageBox.information(self,"İçe Aktar",f"{count} filament güncellendi.")
+        except Exception as ex: QMessageBox.warning(self,"Hata",str(ex))
+
+    def refresh(self): self._refresh()
+
+
+# ═══════════════════════════════════════════════════════════════
+#  SATIŞ YÖNETİMİ (orijinalden + QR ödeme kodu)
+# ═══════════════════════════════════════════════════════════════
+class SalesPage(QWidget):
+    def __init__(self, user, parent=None):
+        super().__init__(parent)
+        self.user = user
+        self.all_sales = []
+        self._build_ui()
+        self._refresh()
+
+    def _build_ui(self):
+        main = QHBoxLayout(self)
+        main.setContentsMargins(16,16,16,16)
+        main.setSpacing(12)
+
+        form_scroll = QScrollArea(); form_scroll.setWidgetResizable(True)
+        form_scroll.setFrameShape(QFrame.Shape.NoFrame); form_scroll.setFixedWidth(380)
+        fw = QWidget(); fl = QVBoxLayout(fw)
+        fl.setContentsMargins(0,0,8,0); fl.setSpacing(8)
+        form_scroll.setWidget(fw)
+
+        card = CardFrame(); cl = QVBoxLayout(card)
+        cl.setContentsMargins(20,16,20,16); cl.setSpacing(8)
+
+        title = QLabel("💰 YENİ SATIŞ")
+        title.setFont(QFont("Courier New",14,QFont.Weight.Bold))
+        title.setStyleSheet(f"color: {SM.t('accent')}; border: none;")
+        cl.addWidget(title)
+
+        cl.addWidget(QLabel("Proje (opsiyonel):")); self.cb_prj=QComboBox(); self.cb_prj.setMinimumHeight(38); cl.addWidget(self.cb_prj)
+        cl.addWidget(QLabel("Müşteri:")); self.cb_cust=QComboBox(); self.cb_cust.setMinimumHeight(38); cl.addWidget(self.cb_cust)
+
+        self.e_product=QLineEdit(); self.e_product.setPlaceholderText("Ürün adı *"); self.e_product.setMinimumHeight(38)
+        self.e_price=QLineEdit(); self.e_price.setPlaceholderText("Birim fiyat (TL) *"); self.e_price.setMinimumHeight(38)
+        self.e_qty=QLineEdit(); self.e_qty.setPlaceholderText("Adet"); self.e_qty.setText("1"); self.e_qty.setMinimumHeight(38)
+        self.e_disc=QLineEdit(); self.e_disc.setPlaceholderText("İndirim %"); self.e_disc.setText("0"); self.e_disc.setMinimumHeight(38)
+        self.e_kargo=QLineEdit(); self.e_kargo.setPlaceholderText("Kargo ücreti TL"); self.e_kargo.setText("0"); self.e_kargo.setMinimumHeight(38)
+        self.e_sale_note=QLineEdit(); self.e_sale_note.setPlaceholderText("Not"); self.e_sale_note.setMinimumHeight(38)
+        for w in [self.e_product,self.e_price,self.e_qty,self.e_disc,self.e_kargo,self.e_sale_note]: cl.addWidget(w)
+
+        cl.addWidget(QLabel("Ödeme Yöntemi:"))
+        self.cb_pay=QComboBox(); self.cb_pay.setMinimumHeight(38)
+        self.cb_pay.addItems(["Nakit","Kredi Kartı","EFT/Havale","Taksit","PayTR","PayPal","Kripto","Diğer"])
+        cl.addWidget(self.cb_pay)
+
+        cl.addWidget(QLabel("Sipariş Durumu:"))
+        self.cb_order=QComboBox(); self.cb_order.setMinimumHeight(38)
+        self.cb_order.addItems(["📦 Hazırlanıyor","🚚 Kargoda","✅ Teslim Edildi","↩️ İade","❌ İptal"])
+        cl.addWidget(self.cb_order)
+
+        self.chk_kdv=QCheckBox("KDV Ekle (%20)")
+        self.chk_kdv.setStyleSheet(f"color: {SM.t('text')};")
+        cl.addWidget(self.chk_kdv)
+
+        btn_row = QHBoxLayout()
+        calc_btn=StyledButton("⚡ Hesapla","warning"); calc_btn.clicked.connect(self._calc_sale)
+        qr_btn=StyledButton("📱 QR Kod","flat"); qr_btn.clicked.connect(self._gen_qr)
+        btn_row.addWidget(calc_btn); btn_row.addWidget(qr_btn)
+        cl.addLayout(btn_row)
+
+        self.lbl_calc=QLabel(""); self.lbl_calc.setWordWrap(True)
+        self.lbl_calc.setStyleSheet(f"color: {SM.t('warning')}; border: none;")
+        cl.addWidget(self.lbl_calc)
+
+        save_btn=StyledButton("💾 Satışı Kaydet"); save_btn.clicked.connect(self._add_sale)
+        cl.addWidget(save_btn)
+        self.sale_info=QLabel(""); self.sale_info.setWordWrap(True)
+        self.sale_info.setStyleSheet(f"color: {SM.t('success')}; border: none;")
+        cl.addWidget(self.sale_info)
+
+        sep=QFrame(); sep.setFrameShape(QFrame.Shape.HLine); cl.addWidget(sep)
+        cl.addWidget(QLabel("📊 Satış Özeti:"))
+        self.pos_summary=QLabel(""); self.pos_summary.setStyleSheet(f"color: {SM.t('accent')}; font-weight: bold; border: none;")
+        self.pos_summary.setWordWrap(True); cl.addWidget(self.pos_summary)
+        cl.addStretch()
+        fl.addWidget(card); fl.addStretch()
+        main.addWidget(form_scroll)
+
+        right=QWidget(); rl=QVBoxLayout(right); rl.setContentsMargins(0,0,0,0); rl.setSpacing(8)
+        hdr=QHBoxLayout()
+        hl=QLabel("SATIŞ GEÇMİŞİ")
+        hl.setFont(QFont("Courier New",14,QFont.Weight.Bold))
+        hl.setStyleSheet(f"color: {SM.t('accent')}; border: none;"); hdr.addWidget(hl); hdr.addStretch()
+        self.search_sale=QLineEdit(); self.search_sale.setPlaceholderText("🔍 Ara..."); self.search_sale.setMinimumHeight(36); self.search_sale.setMaximumWidth(200)
+        self.search_sale.textChanged.connect(self._filter_table); hdr.addWidget(self.search_sale)
+        for text,func,style in [("🗑 Sil",self._del_sale,"danger"),("📥 CSV",self._export_csv,"flat")]:
+            btn=StyledButton(text,style); btn.setMinimumHeight(36); btn.clicked.connect(func); hdr.addWidget(btn)
+        rl.addLayout(hdr)
+
+        self.table=QTableWidget(); self.table.setColumnCount(11)
+        self.table.setHorizontalHeaderLabels(["#","Ürün","Müşteri","Adet","Birim","İnd%","Kargo","TOPLAM","Kar","Ödeme","Tarih"])
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.table.setAlternatingRowColors(True); self.table.setMinimumHeight(400); rl.addWidget(self.table)
+        self.sel_input=QLineEdit(); self.sel_input.setPlaceholderText("Silmek için no"); self.sel_input.setMinimumHeight(36); rl.addWidget(self.sel_input)
+        self.total_lbl=QLabel(""); self.total_lbl.setStyleSheet(f"color: {SM.t('success')}; font-weight: bold; border: none;"); rl.addWidget(self.total_lbl)
+        main.addWidget(right)
+
+    def _update_combos(self):
+        projects=u_load(PROJECTS_FILE,self.user); customers=u_load(CUSTOMERS_FILE,self.user)
+        self.cb_prj.clear(); self.cb_prj.addItem("(Bağımsız)")
+        for i,p in enumerate(projects): self.cb_prj.addItem(f"[{i+1}] {p.get('model_adi','')}")
+        self.cb_cust.clear(); self.cb_cust.addItem("(Anonim)")
+        for c in customers: self.cb_cust.addItem(c.get("ad",""))
+
+    def _calc_sale(self):
+        try:
+            price=float(self.e_price.text().replace(",",".") or "0")
+            qty=int(self.e_qty.text() or "1")
+            disc=float(self.e_disc.text().replace(",",".") or "0")
+            kargo=float(self.e_kargo.text().replace(",",".") or "0")
+            kdv_r=get_settings().get("kdv_rate",20) if self.chk_kdv.isChecked() else 0
+            subtotal=price*qty; indirim=subtotal*(disc/100); total=subtotal-indirim+kargo
+            kdv_amount=total*(kdv_r/100); genel=total+kdv_amount
+            self.lbl_calc.setText(
+                f"Ara Toplam: {subtotal:.2f} TL  |  İndirim: {indirim:.2f} TL\n"
+                f"Kargo: {kargo:.2f} TL  |  KDV ({kdv_r}%): {kdv_amount:.2f} TL\n"
+                f"GENEL TOPLAM: {genel:.2f} TL"
+            )
+        except Exception as ex: self.lbl_calc.setText(f"Hata: {ex}")
+
+    def _gen_qr(self):
+        if not QR_OK:
+            QMessageBox.warning(self,"Hata","qrcode kurulu değil.\npip install qrcode pillow"); return
+        try:
+            price=float(self.e_price.text().replace(",",".") or "0")
+            product=self.e_product.text().strip() or "Ürün"
+            qr_data=f"3D Atölye Ödeme\nÜrün: {product}\nTutar: {price:.2f} TL\nTarih: {datetime.now().strftime('%d.%m.%Y')}"
+            qr=qrcode.QRCode(version=1,box_size=6,border=2)
+            qr.add_data(qr_data); qr.make(fit=True)
+            img=qr.make_image(fill_color="black",back_color="white")
+            tmp=tempfile.NamedTemporaryFile(delete=False,suffix=".png")
+            img.save(tmp.name)
+
+            dlg=QDialog(self); dlg.setWindowTitle(f"QR Kod — {product}")
+            dlg.setStyleSheet(f"background: {SM.t('bg')};")
+            l=QVBoxLayout(dlg)
+            lbl=QLabel(); pm=QPixmap(tmp.name); lbl.setPixmap(pm.scaled(300,300,Qt.AspectRatioMode.KeepAspectRatio))
+            lbl.setAlignment(Qt.AlignmentFlag.AlignCenter); l.addWidget(lbl)
+            info=QLabel(f"💰 {product} — {price:.2f} TL")
+            info.setStyleSheet(f"color: {SM.t('accent')}; font-weight: bold; font-size: 14px;")
+            info.setAlignment(Qt.AlignmentFlag.AlignCenter); l.addWidget(info)
+            save_btn=StyledButton("💾 PNG Kaydet"); save_btn.clicked.connect(lambda: self._save_qr(tmp.name)); l.addWidget(save_btn)
+            bb=QDialogButtonBox(QDialogButtonBox.StandardButton.Close); bb.rejected.connect(dlg.reject); l.addWidget(bb)
+            dlg.exec()
+            os.unlink(tmp.name)
+        except Exception as ex: QMessageBox.warning(self,"QR Hata",str(ex))
+
+    def _save_qr(self, tmp_path):
+        path,_=QFileDialog.getSaveFileName(self,"QR PNG Kaydet","qr_odeme.png","PNG (*.png)")
+        if path: shutil.copy(tmp_path,path); QMessageBox.information(self,"Kaydedildi",path)
+
+    def _add_sale(self):
+        try:
+            product=self.e_product.text().strip()
+            price=float(self.e_price.text().replace(",","."))
+            qty=int(self.e_qty.text() or "1")
+            disc=float(self.e_disc.text().replace(",",".") or "0")
+            kargo=float(self.e_kargo.text().replace(",",".") or "0")
+            payment=self.cb_pay.currentText(); customer=self.cb_cust.currentText()
+            order_s=self.cb_order.currentText(); note=self.e_sale_note.text().strip()
+            kdv_r=get_settings().get("kdv_rate",20) if self.chk_kdv.isChecked() else 0
+            if not product:
+                self.sale_info.setStyleSheet(f"color: {SM.t('danger')}; border: none;")
+                self.sale_info.setText("✗ Ürün adı boş."); return
+            subtotal=price*qty; indirim=subtotal*(disc/100)
+            total_bfr=subtotal-indirim+kargo; kdv_amount=total_bfr*(kdv_r/100); total=total_bfr+kdv_amount
+            prj_cost=0; prj_name=""
+            prj_txt=self.cb_prj.currentText()
+            if prj_txt!="(Bağımsız)":
+                try:
+                    idx=int(prj_txt.split("]")[0].replace("[",""))-1
+                    prj=u_load(PROJECTS_FILE,self.user)[idx]
+                    prj_cost=prj.get("toplam_maliyet",0); prj_name=prj.get("model_adi","")
+                except: pass
+            kar=total-prj_cost*qty
+            if customer!="(Anonim)":
+                customers=u_load(CUSTOMERS_FILE,self.user)
+                for c in customers:
+                    if c.get("ad")==customer: c["sadakat_puan"]=c.get("sadakat_puan",0)+int(total/10)
+                u_save(CUSTOMERS_FILE,self.user,customers)
+            s={
+                "owner":self.user,"urun":product.title(),"proje":prj_name,"musteri":customer,
+                "birim_fiyat":price,"adet":qty,"indirim_yuzde":disc,"kargo":kargo,
+                "kdv_oran":kdv_r,"kdv_tutar":round(kdv_amount,2),"satis_fiyati":round(total,2),
+                "maliyet":round(prj_cost*qty,2),"kar":round(kar,2),"odeme":payment,
+                "siparis_durumu":order_s,"not":note,"tarih":datetime.now().strftime("%d.%m.%Y %H:%M"),
+            }
+            sales=u_load(SALES_FILE,self.user); sales.append(s); u_save(SALES_FILE,self.user,sales)
+            log_activity(self.user,"SATIŞ KAYDEDİLDİ",f"{product} — {total:.2f} TL")
+            self.sale_info.setStyleSheet(f"color: {SM.t('success')}; border: none;")
+            self.sale_info.setText(f"✓ Kaydedildi | Toplam: {total:.2f} TL | Kar: {kar:.2f} TL")
+            for e in [self.e_product,self.e_price,self.e_sale_note]: e.clear()
+            self.e_qty.setText("1"); self.e_disc.setText("0"); self.e_kargo.setText("0")
+            self._refresh()
+        except ValueError as ex:
+            self.sale_info.setStyleSheet(f"color: {SM.t('danger')}; border: none;")
+            self.sale_info.setText(f"✗ {ex}")
+
+    def _del_sale(self):
+        rows=self.table.selectedItems()
+        idx=self.table.row(rows[0]) if rows else -1
+        if idx<0:
+            try: idx=int(self.sel_input.text().strip())-1
+            except: idx=-1
+        if idx<0 or idx>=len(self.all_sales): return
+        if QMessageBox.question(self,"Onay","Satış silinsin mi?",
+            QMessageBox.StandardButton.Yes|QMessageBox.StandardButton.No)!=QMessageBox.StandardButton.Yes: return
+        target=self.all_sales[idx]; sales=u_load(SALES_FILE,self.user)
+        real=next((i for i,s in enumerate(sales) if s.get("tarih")==target.get("tarih") and s.get("urun")==target.get("urun")),-1)
+        if real>=0: sales.pop(real); u_save(SALES_FILE,self.user,sales)
+        self.sel_input.clear(); self._refresh()
+
+    def _refresh(self):
+        self._update_combos(); self.all_sales=u_load(SALES_FILE,self.user); self._filter_table()
+        t_sat=sum(s.get("satis_fiyati",0) for s in self.all_sales)
+        t_kar=sum(s.get("kar",0) for s in self.all_sales)
+        t_kdv=sum(s.get("kdv_tutar",0) for s in self.all_sales)
+        self.pos_summary.setText(f"Toplam Satış: {t_sat:,.2f} TL\nNet Kar: {t_kar:,.2f} TL\nToplam KDV: {t_kdv:,.2f} TL")
+
+    def _filter_table(self):
+        kw=self.search_sale.text().strip().lower() if hasattr(self,"search_sale") else ""
+        filtered=[s for s in self.all_sales if kw in f"{s.get('urun','')} {s.get('musteri','')}".lower()] if kw else self.all_sales
+        self.table.setRowCount(len(filtered))
+        for i,s in enumerate(filtered):
+            for j,val in enumerate([str(i+1),s.get("urun",""),s.get("musteri","Anonim"),
+                str(s.get("adet",1)),f"{s.get('birim_fiyat',0):.2f}",f"{s.get('indirim_yuzde',0)}%",
+                f"{s.get('kargo',0):.2f}",f"{s.get('satis_fiyati',0):.2f} TL",
+                f"{s.get('kar',0):.2f} TL",s.get("odeme",""),s.get("tarih","")[:10]]):
+                item=QTableWidgetItem(val); item.setFlags(item.flags()&~Qt.ItemFlag.ItemIsEditable)
+                if j==8: item.setForeground(QColor(SM.t("success") if s.get("kar",0)>=0 else SM.t("danger")))
+                self.table.setItem(i,j,item)
+        t_sat=sum(s.get("satis_fiyati",0) for s in filtered)
+        t_kar=sum(s.get("kar",0) for s in filtered)
+        self.total_lbl.setText(f"Gösterilen: {len(filtered)} satış  |  Toplam: {t_sat:,.2f} TL  |  Net Kar: {t_kar:,.2f} TL")
+
+    def _export_csv(self):
+        path,_=QFileDialog.getSaveFileName(self,"CSV Kaydet",f"satislar_{datetime.now().strftime('%Y%m%d')}.csv","CSV (*.csv)")
+        if not path: return
+        with open(path,"w",encoding="utf-8-sig",newline="") as f:
+            w=csv.writer(f)
+            w.writerow(["Ürün","Müşteri","Adet","Birim","İnd%","Kargo","KDV","Toplam","Kar","Ödeme","Tarih"])
+            for s in u_load(SALES_FILE,self.user):
+                w.writerow([s.get("urun",""),s.get("musteri",""),s.get("adet",1),s.get("birim_fiyat",0),
+                            s.get("indirim_yuzde",0),s.get("kargo",0),s.get("kdv_tutar",0),
+                            s.get("satis_fiyati",0),s.get("kar",0),s.get("odeme",""),s.get("tarih","")])
+        QMessageBox.information(self,"CSV",f"Kaydedildi:\n{path}")
+
+    def refresh(self): self._refresh()
+
+
+# ═══════════════════════════════════════════════════════════════
+#  FİNANS, MÜŞTERİ, GÖREVLER, NOTLAR, BAKIM, LOG
+#  (orijinalden korundu — sadece CardFrame/StyledButton kullanır)
+# ═══════════════════════════════════════════════════════════════
+class FinancePage(QWidget):
+    def __init__(self, user, parent=None):
+        super().__init__(parent)
+        self.user = user
+        self._build_ui()
+        self._refresh()
+
+    def _build_ui(self):
+        main = QHBoxLayout(self); main.setContentsMargins(16,16,16,16); main.setSpacing(12)
+        left = CardFrame(); left.setFixedWidth(360)
+        ll = QVBoxLayout(left); ll.setContentsMargins(20,16,20,16); ll.setSpacing(8)
+        title=QLabel("📤 GİDER EKLE"); title.setFont(QFont("Courier New",14,QFont.Weight.Bold))
+        title.setStyleSheet(f"color: {SM.t('accent')}; border: none;"); ll.addWidget(title)
+        self.e_exp_title=QLineEdit(); self.e_exp_title.setPlaceholderText("Başlık *"); self.e_exp_title.setMinimumHeight(38)
+        self.e_exp_amount=QLineEdit(); self.e_exp_amount.setPlaceholderText("Tutar (TL) *"); self.e_exp_amount.setMinimumHeight(38)
+        self.e_exp_note=QLineEdit(); self.e_exp_note.setPlaceholderText("Açıklama"); self.e_exp_note.setMinimumHeight(38)
+        ll.addWidget(self.e_exp_title); ll.addWidget(self.e_exp_amount); ll.addWidget(self.e_exp_note)
+        ll.addWidget(QLabel("Kategori:"))
+        self.cb_exp_cat=QComboBox(); self.cb_exp_cat.setMinimumHeight(38)
+        self.cb_exp_cat.addItems(["Filament Alımı","Elektrik","Bakım/Onarım","Ekipman Alımı","Kargo & Ambalaj","Pazarlama","Nozul/Parça","Internet/Yazılım","Oda Kirası","Diğer"])
+        ll.addWidget(self.cb_exp_cat)
+        save_exp=StyledButton("💾 Gider Kaydet"); save_exp.clicked.connect(self._add_expense); ll.addWidget(save_exp)
+        self.exp_info=QLabel(""); self.exp_info.setWordWrap(True); self.exp_info.setStyleSheet(f"color: {SM.t('success')}; border: none;"); ll.addWidget(self.exp_info)
+        sep=QFrame(); sep.setFrameShape(QFrame.Shape.HLine); ll.addWidget(sep)
+        fin_title=QLabel("📊 FİNANSAL ÖZET"); fin_title.setFont(QFont("Courier New",13,QFont.Weight.Bold))
+        fin_title.setStyleSheet(f"color: {SM.t('accent')}; border: none;"); ll.addWidget(fin_title)
+        self.summary_text=QTextEdit(); self.summary_text.setReadOnly(True); self.summary_text.setMinimumHeight(280)
+        self.summary_text.setStyleSheet(f"background: {SM.t('input_bg')}; color: {SM.t('text')}; border: 1px solid {SM.t('border')}; border-radius: 8px;")
+        self.summary_text.setFont(QFont("Courier New",12)); ll.addWidget(self.summary_text); ll.addStretch()
+        main.addWidget(left)
+        right=QWidget(); rl=QVBoxLayout(right); rl.setContentsMargins(0,0,0,0); rl.setSpacing(8)
+        hdr=QHBoxLayout(); hl=QLabel("GİDER GEÇMİŞİ"); hl.setFont(QFont("Courier New",14,QFont.Weight.Bold)); hl.setStyleSheet(f"color: {SM.t('accent')}; border: none;"); hdr.addWidget(hl); hdr.addStretch()
+        for text,func,style in [("🗑 Sil",self._del_expense,"danger"),("📥 CSV",self._export_csv,"flat")]:
+            btn=StyledButton(text,style); btn.setMinimumHeight(36); btn.clicked.connect(func); hdr.addWidget(btn)
+        rl.addLayout(hdr)
+        self.table=QTableWidget(); self.table.setColumnCount(5)
+        self.table.setHorizontalHeaderLabels(["#","Başlık","Tutar TL","Kategori","Tarih"])
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.table.setAlternatingRowColors(True); rl.addWidget(self.table)
+        self.sel_input=QLineEdit(); self.sel_input.setPlaceholderText("Silmek için gider no"); self.sel_input.setMinimumHeight(36); rl.addWidget(self.sel_input)
+        self.bar_container=QVBoxLayout(); rl.addLayout(self.bar_container)
+        main.addWidget(right)
+
+    def _add_expense(self):
+        try:
+            title=self.e_exp_title.text().strip(); amount=float(self.e_exp_amount.text().replace(",","."))
+            note=self.e_exp_note.text().strip(); cat=self.cb_exp_cat.currentText()
+            if not title:
+                self.exp_info.setStyleSheet(f"color: {SM.t('danger')}; border: none;")
+                self.exp_info.setText("✗ Başlık boş."); return
+            exps=u_load(EXPENSES_FILE,self.user)
+            exps.append({"owner":self.user,"baslik":title.title(),"tutar":amount,"kategori":cat,"not":note,"tarih":datetime.now().strftime("%d.%m.%Y %H:%M")})
+            u_save(EXPENSES_FILE,self.user,exps)
+            log_activity(self.user,"GİDER KAYDEDİLDİ",f"{title} — {amount:.2f} TL")
+            self.exp_info.setStyleSheet(f"color: {SM.t('success')}; border: none;")
+            self.exp_info.setText(f"✓ {amount:.2f} TL kaydedildi.")
+            self.e_exp_title.clear(); self.e_exp_amount.clear(); self.e_exp_note.clear()
+            self._refresh()
+        except ValueError:
+            self.exp_info.setStyleSheet(f"color: {SM.t('danger')}; border: none;")
+            self.exp_info.setText("✗ Tutar sayı olmalı.")
+
+    def _del_expense(self):
+        rows=self.table.selectedItems(); idx=self.table.row(rows[0]) if rows else -1
+        if idx<0:
+            try: idx=int(self.sel_input.text().strip())-1
+            except: idx=-1
+        exps=u_load(EXPENSES_FILE,self.user)
+        if idx<0 or idx>=len(exps): return
+        if QMessageBox.question(self,"Onay","Gider silinsin mi?",
+            QMessageBox.StandardButton.Yes|QMessageBox.StandardButton.No)!=QMessageBox.StandardButton.Yes: return
+        exps.pop(idx); u_save(EXPENSES_FILE,self.user,exps); self.sel_input.clear(); self._refresh()
+
+    def _refresh(self):
+        exps=u_load(EXPENSES_FILE,self.user); sales=u_load(SALES_FILE,self.user); projects=u_load(PROJECTS_FILE,self.user)
+        t_sat=sum(s.get("satis_fiyati",0) for s in sales); t_mal=sum(p.get("toplam_maliyet",0) for p in projects)
+        t_gid=sum(e.get("tutar",0) for e in exps); net=t_sat-t_mal-t_gid; t_kdv=sum(s.get("kdv_tutar",0) for s in sales)
+        cat_totals={}
+        for e in exps: cat_totals[e.get("kategori","Diğer")]=cat_totals.get(e.get("kategori","Diğer"),0)+e.get("tutar",0)
+        summary=(f" Toplam Satış    : {t_sat:>10,.2f} TL\n Proje Maliyeti  : {t_mal:>10,.2f} TL\n"
+                 f" Toplam Gider    : {t_gid:>10,.2f} TL\n Toplam KDV      : {t_kdv:>10,.2f} TL\n"
+                 +"─"*34+"\n"+f" NET KAR/ZARAR   : {net:>10,.2f} TL\n\n Kategori Bazlı:\n")
+        for cat,total in sorted(cat_totals.items(),key=lambda x:x[1],reverse=True):
+            summary+=f"  {cat:<18}: {total:,.2f} TL\n"
+        self.summary_text.setPlainText(summary)
+        self.table.setRowCount(len(exps))
+        for i,e in enumerate(exps):
+            for j,val in enumerate([str(i+1),e.get("baslik",""),f"{e.get('tutar',0):.2f} TL",e.get("kategori",""),e.get("tarih","")[:10]]):
+                item=QTableWidgetItem(val); item.setFlags(item.flags()&~Qt.ItemFlag.ItemIsEditable); self.table.setItem(i,j,item)
+        while self.bar_container.count():
+            it=self.bar_container.takeAt(0)
+            if it.widget(): it.widget().deleteLater()
+        if cat_totals:
+            bc=BarChart(cat_totals,SM.t("danger")); bc.setMinimumHeight(100); self.bar_container.addWidget(bc)
+
+    def _export_csv(self):
+        path,_=QFileDialog.getSaveFileName(self,"CSV Kaydet",f"giderler_{datetime.now().strftime('%Y%m%d')}.csv","CSV (*.csv)")
+        if not path: return
+        exps=u_load(EXPENSES_FILE,self.user)
+        with open(path,"w",encoding="utf-8-sig",newline="") as f:
+            w=csv.writer(f); w.writerow(["Başlık","Tutar","Kategori","Not","Tarih"])
+            for e in exps: w.writerow([e.get("baslik",""),e.get("tutar",0),e.get("kategori",""),e.get("not",""),e.get("tarih","")])
+        QMessageBox.information(self,"CSV",f"Kaydedildi:\n{path}")
+
+    def refresh(self): self._refresh()
+
+
+class CustomersPage(QWidget):
+    def __init__(self, user, parent=None):
+        super().__init__(parent)
+        self.user = user
+        self.all_customers = []
+        self._build_ui()
+        self._refresh()
+
+    def _build_ui(self):
+        main=QHBoxLayout(self); main.setContentsMargins(16,16,16,16); main.setSpacing(12)
+        left=CardFrame(); left.setFixedWidth(360)
+        ll=QVBoxLayout(left); ll.setContentsMargins(20,16,20,16); ll.setSpacing(8)
+        title=QLabel("👥 MÜŞTERİ EKLE"); title.setFont(QFont("Courier New",14,QFont.Weight.Bold))
+        title.setStyleSheet(f"color: {SM.t('accent')}; border: none;"); ll.addWidget(title)
+        for attr,ph in [("e_cust_name","Ad Soyad *"),("e_cust_phone","Telefon"),("e_cust_email","E-posta"),
+                        ("e_cust_address","Adres"),("e_cust_company","Firma"),("e_cust_note","Not"),("e_cust_bday","Doğum Günü (GG.AA.YYYY)")]:
+            e=QLineEdit(); e.setPlaceholderText(ph); e.setMinimumHeight(38); ll.addWidget(e); setattr(self,attr,e)
+        ll.addWidget(QLabel("Kategori:"))
+        self.cb_cust_cat=QComboBox(); self.cb_cust_cat.setMinimumHeight(38)
+        self.cb_cust_cat.addItems(["Standart","VIP","Toptan","Kurumsal","Öğrenci"]); ll.addWidget(self.cb_cust_cat)
+        save_btn=StyledButton("💾 Müşteri Ekle"); save_btn.clicked.connect(self._add_customer); ll.addWidget(save_btn)
+        self.cust_info=QLabel(""); self.cust_info.setWordWrap(True); self.cust_info.setStyleSheet(f"color: {SM.t('success')}; border: none;"); ll.addWidget(self.cust_info); ll.addStretch()
+        main.addWidget(left)
+        right=QWidget(); rl=QVBoxLayout(right); rl.setContentsMargins(0,0,0,0); rl.setSpacing(8)
+        hdr=QHBoxLayout(); hl=QLabel("MÜŞTERİ LİSTESİ"); hl.setFont(QFont("Courier New",14,QFont.Weight.Bold)); hl.setStyleSheet(f"color: {SM.t('accent')}; border: none;"); hdr.addWidget(hl); hdr.addStretch()
+        self.cust_search=QLineEdit(); self.cust_search.setPlaceholderText("🔍 Ara..."); self.cust_search.setMaximumWidth(200); self.cust_search.setMinimumHeight(36); self.cust_search.textChanged.connect(self._filter); hdr.addWidget(self.cust_search)
+        for text,func,style in [("📋 Detay",self._show_detail,"flat"),("🗑 Sil",self._del_customer,"danger"),("📥 CSV",self._export_csv,"flat")]:
+            btn=StyledButton(text,style); btn.setMinimumHeight(36); btn.clicked.connect(func); hdr.addWidget(btn)
+        rl.addLayout(hdr)
+        self.table=QTableWidget(); self.table.setColumnCount(9)
+        self.table.setHorizontalHeaderLabels(["#","Ad Soyad","Telefon","E-posta","Kategori","Sadakat","Alışveriş","Toplam TL","Kayıt"])
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows); self.table.setAlternatingRowColors(True); rl.addWidget(self.table)
+        self.sel_input=QLineEdit(); self.sel_input.setPlaceholderText("Silmek için müşteri no"); self.sel_input.setMinimumHeight(36); rl.addWidget(self.sel_input)
+        main.addWidget(right)
+
+    def _add_customer(self):
+        name=self.e_cust_name.text().strip()
+        if not name:
+            self.cust_info.setStyleSheet(f"color: {SM.t('danger')}; border: none;"); self.cust_info.setText("✗ Ad boş."); return
+        custs=u_load(CUSTOMERS_FILE,self.user)
+        custs.append({"owner":self.user,"ad":name.title(),"telefon":self.e_cust_phone.text().strip(),
+                      "email":self.e_cust_email.text().strip(),"adres":self.e_cust_address.text().strip(),
+                      "firma":self.e_cust_company.text().strip(),"not":self.e_cust_note.text().strip(),
+                      "dogum_gunu":self.e_cust_bday.text().strip(),"kategori":self.cb_cust_cat.currentText(),
+                      "sadakat_puan":0,"kayit":datetime.now().strftime("%d.%m.%Y %H:%M")})
+        u_save(CUSTOMERS_FILE,self.user,custs)
+        log_activity(self.user,"MÜŞTERİ EKLENDİ",name)
+        self.cust_info.setStyleSheet(f"color: {SM.t('success')}; border: none;"); self.cust_info.setText(f"✓ {name} eklendi.")
+        for attr in ["e_cust_name","e_cust_phone","e_cust_email","e_cust_address","e_cust_company","e_cust_note","e_cust_bday"]: getattr(self,attr).clear()
+        self._refresh()
+
+    def _del_customer(self):
+        rows=self.table.selectedItems(); idx=self.table.row(rows[0]) if rows else -1
+        if idx<0:
+            try: idx=int(self.sel_input.text().strip())-1
+            except: idx=-1
+        if idx<0 or idx>=len(self.all_customers): return
+        if QMessageBox.question(self,"Onay","Müşteri silinsin mi?",
+            QMessageBox.StandardButton.Yes|QMessageBox.StandardButton.No)!=QMessageBox.StandardButton.Yes: return
+        target=self.all_customers[idx]; custs=u_load(CUSTOMERS_FILE,self.user)
+        real=next((i for i,c in enumerate(custs) if c.get("kayit")==target.get("kayit") and c.get("ad")==target.get("ad")),-1)
+        if real>=0: custs.pop(real)
+        u_save(CUSTOMERS_FILE,self.user,custs); self.sel_input.clear(); self._refresh()
+
+    def _show_detail(self):
+        rows=self.table.selectedItems()
+        if not rows: return
+        idx=self.table.row(rows[0])
+        if idx<0 or idx>=len(self.all_customers): return
+        c=self.all_customers[idx]; sales=u_load(SALES_FILE,self.user); c_sales=[s for s in sales if s.get("musteri")==c.get("ad")]
+        detail=(f"Ad Soyad  : {c.get('ad','')}\nTelefon   : {c.get('telefon','')}\nE-posta   : {c.get('email','')}\n"
+                f"Adres     : {c.get('adres','')}\nFirma     : {c.get('firma','')}\nKategori  : {c.get('kategori','')}\n"
+                f"Sadakat   : {c.get('sadakat_puan',0)} puan\nDoğum Günü: {c.get('dogum_gunu','')}\nNot       : {c.get('not','')}\n"
+                f"─────────────────────────\nAlışveriş : {len(c_sales)} sipariş\nToplam    : {sum(s.get('satis_fiyati',0) for s in c_sales):,.2f} TL\n")
+        dlg=QDialog(self); dlg.setWindowTitle(f"Müşteri Detayı - {c.get('ad','')}"); dlg.setMinimumSize(400,380)
+        dlg.setStyleSheet(f"background: {SM.t('bg')}; color: {SM.t('text')};")
+        l=QVBoxLayout(dlg); te=QTextEdit(); te.setReadOnly(True); te.setPlainText(detail)
+        te.setFont(QFont("Courier New",12)); te.setStyleSheet(f"background: {SM.t('input_bg')}; color: {SM.t('text')}; border: 1px solid {SM.t('border')};")
+        l.addWidget(te); bb=QDialogButtonBox(QDialogButtonBox.StandardButton.Close); bb.rejected.connect(dlg.reject); l.addWidget(bb); dlg.exec()
+
+    def _refresh(self): self.all_customers=u_load(CUSTOMERS_FILE,self.user); self._filter()
+
+    def _filter(self):
+        kw=self.cust_search.text().strip().lower() if hasattr(self,"cust_search") else ""
+        filtered=[c for c in self.all_customers if kw in f"{c.get('ad','')} {c.get('email','')} {c.get('telefon','')}".lower()] if kw else self.all_customers
+        sales=u_load(SALES_FILE,self.user); self.table.setRowCount(len(filtered))
+        for i,c in enumerate(filtered):
+            name=c.get("ad",""); c_sales=[s for s in sales if s.get("musteri")==name]; total=sum(s.get("satis_fiyati",0) for s in c_sales)
+            for j,val in enumerate([str(i+1),name,c.get("telefon",""),c.get("email",""),c.get("kategori",""),str(c.get("sadakat_puan",0)),str(len(c_sales)),f"{total:,.2f}",c.get("kayit","")[:10]]):
+                item=QTableWidgetItem(val); item.setFlags(item.flags()&~Qt.ItemFlag.ItemIsEditable)
+                if c.get("kategori")=="VIP": item.setForeground(QColor(SM.t("warning")))
+                self.table.setItem(i,j,item)
+
+    def _export_csv(self):
+        path,_=QFileDialog.getSaveFileName(self,"CSV Kaydet",f"musteriler_{datetime.now().strftime('%Y%m%d')}.csv","CSV (*.csv)")
+        if not path: return
+        custs=u_load(CUSTOMERS_FILE,self.user)
+        with open(path,"w",encoding="utf-8-sig",newline="") as f:
+            w=csv.writer(f); w.writerow(["Ad","Telefon","Email","Adres","Firma","Kategori","Sadakat","Kayıt"])
+            for c in custs: w.writerow([c.get("ad",""),c.get("telefon",""),c.get("email",""),c.get("adres",""),c.get("firma",""),c.get("kategori",""),c.get("sadakat_puan",0),c.get("kayit","")])
+        QMessageBox.information(self,"CSV",f"Kaydedildi:\n{path}")
+
+    def refresh(self): self._refresh()
+
+
+class TasksPage(QWidget):
+    def __init__(self, user, parent=None):
+        super().__init__(parent)
+        self.user = user
+        self.all_tasks = []
+        self._build_ui()
+        self._refresh()
+
+    def _build_ui(self):
+        main=QHBoxLayout(self); main.setContentsMargins(16,16,16,16); main.setSpacing(12)
+        left=CardFrame(); left.setFixedWidth(360)
+        ll=QVBoxLayout(left); ll.setContentsMargins(20,16,20,16); ll.setSpacing(8)
+        title=QLabel("✅ YENİ GÖREV"); title.setFont(QFont("Courier New",14,QFont.Weight.Bold))
+        title.setStyleSheet(f"color: {SM.t('accent')}; border: none;"); ll.addWidget(title)
+        self.e_task_title=QLineEdit(); self.e_task_title.setPlaceholderText("Görev başlığı *"); self.e_task_title.setMinimumHeight(38)
+        self.e_task_detail=QLineEdit(); self.e_task_detail.setPlaceholderText("Detay"); self.e_task_detail.setMinimumHeight(38)
+        self.e_task_due=QDateEdit(); self.e_task_due.setDisplayFormat("dd.MM.yyyy"); self.e_task_due.setDate(QDate.currentDate().addDays(1)); self.e_task_due.setMinimumHeight(38)
+        self.e_task_assign=QLineEdit(); self.e_task_assign.setPlaceholderText("Atanan kişi"); self.e_task_assign.setMinimumHeight(38)
+        for w in [self.e_task_title,self.e_task_detail,self.e_task_due,self.e_task_assign]: ll.addWidget(w)
+        ll.addWidget(QLabel("Öncelik:"))
+        self.cb_task_prio=QComboBox(); self.cb_task_prio.setMinimumHeight(38)
+        self.cb_task_prio.addItems(["🟢 Düşük","🟡 Orta","🔴 Yüksek","🚨 Acil"]); ll.addWidget(self.cb_task_prio)
+        ll.addWidget(QLabel("Kategori:"))
+        self.cb_task_cat=QComboBox(); self.cb_task_cat.setMinimumHeight(38)
+        self.cb_task_cat.addItems(["Genel","Bakım","Sipariş","Alım","Müşteri","Yazılım","Diğer"]); ll.addWidget(self.cb_task_cat)
+        add_btn=StyledButton("➕ Görev Ekle"); add_btn.clicked.connect(self._add_task); ll.addWidget(add_btn)
+        self.task_info=QLabel(""); self.task_info.setStyleSheet(f"color: {SM.t('success')}; border: none;"); ll.addWidget(self.task_info)
+        sep=QFrame(); sep.setFrameShape(QFrame.Shape.HLine); ll.addWidget(sep)
+        ll.addWidget(QLabel("📅 Takvim:"))
+        self.calendar=QCalendarWidget(); self.calendar.setStyleSheet(f"QCalendarWidget {{ background: {SM.t('input_bg')}; color: {SM.t('text')}; }}"); self.calendar.setMaximumHeight(220); ll.addWidget(self.calendar); ll.addStretch()
+        main.addWidget(left)
+        right=QWidget(); rl=QVBoxLayout(right); rl.setContentsMargins(0,0,0,0); rl.setSpacing(8)
+        hdr=QHBoxLayout(); hl=QLabel("GÖREVLER"); hl.setFont(QFont("Courier New",14,QFont.Weight.Bold)); hl.setStyleSheet(f"color: {SM.t('accent')}; border: none;"); hdr.addWidget(hl); hdr.addStretch()
+        for text,func,style in [("✓ Tamamlandı",self._complete_task,"success"),("🗑 Sil",self._del_task,"danger")]:
+            btn=StyledButton(text,style); btn.setMinimumHeight(36); btn.clicked.connect(func); hdr.addWidget(btn)
+        rl.addLayout(hdr)
+        self.table=QTableWidget(); self.table.setColumnCount(7)
+        self.table.setHorizontalHeaderLabels(["#","Başlık","Detay","Öncelik","Kategori","Son Tarih","Durum"])
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows); self.table.setAlternatingRowColors(True); rl.addWidget(self.table)
+        self.sel_input=QLineEdit(); self.sel_input.setPlaceholderText("Görev no"); self.sel_input.setMinimumHeight(36); rl.addWidget(self.sel_input)
+        main.addWidget(right)
+
+    def _add_task(self):
+        title=self.e_task_title.text().strip()
+        if not title:
+            self.task_info.setStyleSheet(f"color: {SM.t('danger')}; border: none;"); self.task_info.setText("✗ Başlık boş."); return
+        tasks=u_load(TASKS_FILE,self.user)
+        tasks.append({"owner":self.user,"baslik":title,"detay":self.e_task_detail.text().strip(),
+                      "son_tarih":self.e_task_due.date().toString("dd.MM.yyyy"),"atanan":self.e_task_assign.text().strip(),
+                      "oncelik":self.cb_task_prio.currentText(),"kategori":self.cb_task_cat.currentText(),
+                      "durum":"Bekliyor","tarih":datetime.now().strftime("%d.%m.%Y %H:%M")})
+        u_save(TASKS_FILE,self.user,tasks)
+        self.task_info.setStyleSheet(f"color: {SM.t('success')}; border: none;"); self.task_info.setText("✓ Görev eklendi.")
+        self.e_task_title.clear(); self.e_task_detail.clear(); self.e_task_assign.clear()
+        self._refresh()
+
+    def _complete_task(self):
+        rows=self.table.selectedItems(); idx=self.table.row(rows[0]) if rows else -1
+        if idx<0:
+            try: idx=int(self.sel_input.text().strip())-1
+            except: idx=-1
+        if idx<0 or idx>=len(self.all_tasks): return
+        target=self.all_tasks[idx]; tasks=u_load(TASKS_FILE,self.user)
+        for t in tasks:
+            if t.get("tarih")==target.get("tarih") and t.get("baslik")==target.get("baslik"): t["durum"]="✅ Tamamlandı"; break
+        u_save(TASKS_FILE,self.user,tasks); self.sel_input.clear(); self._refresh()
+
+    def _del_task(self):
+        rows=self.table.selectedItems(); idx=self.table.row(rows[0]) if rows else -1
+        if idx<0:
+            try: idx=int(self.sel_input.text().strip())-1
+            except: idx=-1
+        if idx<0 or idx>=len(self.all_tasks): return
+        target=self.all_tasks[idx]; tasks=u_load(TASKS_FILE,self.user)
+        real=next((i for i,t in enumerate(tasks) if t.get("tarih")==target.get("tarih") and t.get("baslik")==target.get("baslik")),-1)
+        if real>=0: tasks.pop(real)
+        u_save(TASKS_FILE,self.user,tasks); self.sel_input.clear(); self._refresh()
+
+    def _refresh(self):
+        self.all_tasks=u_load(TASKS_FILE,self.user); self.table.setRowCount(len(self.all_tasks))
+        for i,t in enumerate(self.all_tasks):
+            due=t.get("son_tarih",""); durum=t.get("durum","Bekliyor")
+            for j,val in enumerate([str(i+1),t.get("baslik",""),t.get("detay",""),t.get("oncelik",""),t.get("kategori",""),due,durum]):
+                item=QTableWidgetItem(val); item.setFlags(item.flags()&~Qt.ItemFlag.ItemIsEditable)
+                if "Tamamlandı" in durum: item.setForeground(QColor(SM.t("success")))
+                elif "Acil" in t.get("oncelik",""): item.setForeground(QColor(SM.t("danger")))
+                self.table.setItem(i,j,item)
+
+    def refresh(self): self._refresh()
+
+
+class NotesPage(QWidget):
+    def __init__(self, user, parent=None):
+        super().__init__(parent)
+        self.user = user
+        self.all_notes = []
+        self._build_ui()
+        self._refresh()
+
+    def _build_ui(self):
+        main=QHBoxLayout(self); main.setContentsMargins(16,16,16,16); main.setSpacing(12)
+        left=CardFrame(); left.setFixedWidth(360)
+        ll=QVBoxLayout(left); ll.setContentsMargins(20,16,20,16); ll.setSpacing(8)
+        title=QLabel("📝 YENİ NOT"); title.setFont(QFont("Courier New",14,QFont.Weight.Bold))
+        title.setStyleSheet(f"color: {SM.t('accent')}; border: none;"); ll.addWidget(title)
+        self.e_note_title=QLineEdit(); self.e_note_title.setPlaceholderText("Başlık"); self.e_note_title.setMinimumHeight(38); ll.addWidget(self.e_note_title)
+        ll.addWidget(QLabel("Etiket:"))
+        self.cb_note_tag=QComboBox(); self.cb_note_tag.setMinimumHeight(38)
+        self.cb_note_tag.addItems(["Genel","Teknik","Müşteri","Fikir","Hatırlatma","Gizli"]); ll.addWidget(self.cb_note_tag)
+        ll.addWidget(QLabel("İçerik:"))
+        self.e_note_body=QTextEdit(); self.e_note_body.setMinimumHeight(200)
+        self.e_note_body.setStyleSheet(f"background: {SM.t('input_bg')}; color: {SM.t('text')}; border: 1px solid {SM.t('border')};"); ll.addWidget(self.e_note_body)
+        save_btn=StyledButton("💾 Notu Kaydet"); save_btn.clicked.connect(self._add_note); ll.addWidget(save_btn)
+        self.note_info=QLabel(""); self.note_info.setStyleSheet(f"color: {SM.t('success')}; border: none;"); ll.addWidget(self.note_info); ll.addStretch()
+        main.addWidget(left)
+        right=QWidget(); rl=QVBoxLayout(right); rl.setContentsMargins(0,0,0,0)
+        hdr=QHBoxLayout(); hl=QLabel("NOTLAR"); hl.setFont(QFont("Courier New",14,QFont.Weight.Bold)); hl.setStyleSheet(f"color: {SM.t('accent')}; border: none;"); hdr.addWidget(hl); hdr.addStretch()
+        del_btn=StyledButton("🗑 Sil","danger"); del_btn.setMinimumHeight(36); del_btn.clicked.connect(self._del_note); hdr.addWidget(del_btn); rl.addLayout(hdr)
+        self.table=QTableWidget(); self.table.setColumnCount(4)
+        self.table.setHorizontalHeaderLabels(["#","Başlık","Etiket","Tarih"])
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.table.itemClicked.connect(self._show_note); self.table.setAlternatingRowColors(True); rl.addWidget(self.table)
+        self.note_preview=QTextEdit(); self.note_preview.setReadOnly(True); self.note_preview.setFont(QFont("Courier New",12))
+        self.note_preview.setStyleSheet(f"background: {SM.t('input_bg')}; color: {SM.t('text')}; border: 1px solid {SM.t('border')};"); self.note_preview.setMaximumHeight(200); rl.addWidget(self.note_preview)
+        self.sel_input=QLineEdit(); self.sel_input.setPlaceholderText("Silmek için not no"); self.sel_input.setMinimumHeight(36); rl.addWidget(self.sel_input)
+        main.addWidget(right)
+
+    def _add_note(self):
+        body=self.e_note_body.toPlainText().strip()
+        if not body:
+            self.note_info.setStyleSheet(f"color: {SM.t('danger')}; border: none;"); self.note_info.setText("✗ İçerik boş."); return
+        notes=u_load(NOTES_FILE,self.user)
+        notes.append({"owner":self.user,"baslik":self.e_note_title.text().strip() or "—","icerik":body,"etiket":self.cb_note_tag.currentText(),"tarih":datetime.now().strftime("%d.%m.%Y %H:%M")})
+        u_save(NOTES_FILE,self.user,notes)
+        self.note_info.setStyleSheet(f"color: {SM.t('success')}; border: none;"); self.note_info.setText("✓ Kaydedildi.")
+        self.e_note_title.clear(); self.e_note_body.clear(); self._refresh()
+
+    def _del_note(self):
+        rows=self.table.selectedItems(); idx=self.table.row(rows[0]) if rows else -1
+        if idx<0:
+            try: idx=int(self.sel_input.text().strip())-1
+            except: idx=-1
+        if idx<0 or idx>=len(self.all_notes): return
+        notes=u_load(NOTES_FILE,self.user); target=self.all_notes[idx]
+        real=next((i for i,n in enumerate(notes) if n.get("tarih")==target.get("tarih") and n.get("baslik")==target.get("baslik")),-1)
+        if real>=0: notes.pop(real)
+        u_save(NOTES_FILE,self.user,notes); self.sel_input.clear(); self._refresh()
+
+    def _show_note(self,item):
+        idx=self.table.row(item)
+        if 0<=idx<len(self.all_notes): self.note_preview.setPlainText(self.all_notes[idx].get("icerik",""))
+
+    def _refresh(self):
+        self.all_notes=u_load(NOTES_FILE,self.user); self.table.setRowCount(len(self.all_notes))
+        icons={"Genel":"📄","Teknik":"🔧","Müşteri":"👤","Fikir":"💡","Hatırlatma":"🔔","Gizli":"🔒"}
+        for i,n in enumerate(self.all_notes):
+            icon=icons.get(n.get("etiket",""),"📄")
+            for j,val in enumerate([str(i+1),n.get("baslik",""),f"{icon} {n.get('etiket','')}",n.get("tarih","")[:10]]):
+                item=QTableWidgetItem(val); item.setFlags(item.flags()&~Qt.ItemFlag.ItemIsEditable); self.table.setItem(i,j,item)
+
+    def refresh(self): self._refresh()
+
+
+class MaintenancePage(QWidget):
+    def __init__(self, user, parent=None):
+        super().__init__(parent)
+        self.user = user
+        self.all_maintenance = []
+        self._build_ui()
+        self._refresh()
+
+    def _build_ui(self):
+        main=QHBoxLayout(self); main.setContentsMargins(16,16,16,16); main.setSpacing(12)
+        left=CardFrame(); left.setFixedWidth(360)
+        ll=QVBoxLayout(left); ll.setContentsMargins(20,16,20,16); ll.setSpacing(8)
+        title=QLabel("🔧 BAKIM KAYDI"); title.setFont(QFont("Courier New",14,QFont.Weight.Bold))
+        title.setStyleSheet(f"color: {SM.t('accent')}; border: none;"); ll.addWidget(title)
+        self.e_maint_printer=QLineEdit(); self.e_maint_printer.setPlaceholderText("Yazıcı adı *"); self.e_maint_printer.setMinimumHeight(38)
+        self.e_maint_type=QLineEdit(); self.e_maint_type.setPlaceholderText("Bakım türü *"); self.e_maint_type.setMinimumHeight(38)
+        self.e_maint_cost=QLineEdit(); self.e_maint_cost.setPlaceholderText("Maliyet TL"); self.e_maint_cost.setText("0"); self.e_maint_cost.setMinimumHeight(38)
+        self.e_maint_note=QLineEdit(); self.e_maint_note.setPlaceholderText("Not"); self.e_maint_note.setMinimumHeight(38)
+        for w in [self.e_maint_printer,self.e_maint_type,self.e_maint_cost,self.e_maint_note]: ll.addWidget(w)
+        ll.addWidget(QLabel("Bakım Kategorisi:"))
+        self.cb_maint_cat=QComboBox(); self.cb_maint_cat.setMinimumHeight(38)
+        self.cb_maint_cat.addItems(["Nozul Değişimi","PEI Tabla Temizliği","Kalibrasyon","Yağlama","PTFE Tube","Extruder Temizliği","Belt Germe","Güncelleme","Filament Sıkışması","Donanım Arızası","Diğer"]); ll.addWidget(self.cb_maint_cat)
+        add_btn=StyledButton("💾 Bakım Kaydet"); add_btn.clicked.connect(self._add_maintenance); ll.addWidget(add_btn)
+        self.maint_info=QLabel(""); self.maint_info.setStyleSheet(f"color: {SM.t('success')}; border: none;"); ll.addWidget(self.maint_info); ll.addStretch()
+        main.addWidget(left)
+        right=QWidget(); rl=QVBoxLayout(right)
+        hdr=QHBoxLayout(); hl=QLabel("BAKIM GEÇMİŞİ"); hl.setFont(QFont("Courier New",14,QFont.Weight.Bold)); hl.setStyleSheet(f"color: {SM.t('accent')}; border: none;"); hdr.addWidget(hl); hdr.addStretch()
+        del_btn=StyledButton("🗑 Sil","danger"); del_btn.setMinimumHeight(36); del_btn.clicked.connect(self._del_maint); hdr.addWidget(del_btn); rl.addLayout(hdr)
+        self.table=QTableWidget(); self.table.setColumnCount(6)
+        self.table.setHorizontalHeaderLabels(["#","Yazıcı","Bakım Türü","Kategori","Maliyet","Tarih"])
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows); self.table.setAlternatingRowColors(True); rl.addWidget(self.table)
+        self.sel_input=QLineEdit(); self.sel_input.setPlaceholderText("Silmek için no"); self.sel_input.setMinimumHeight(36); rl.addWidget(self.sel_input)
+        main.addWidget(right)
+
+    def _add_maintenance(self):
+        printer=self.e_maint_printer.text().strip(); mtype=self.e_maint_type.text().strip()
+        if not printer or not mtype:
+            self.maint_info.setStyleSheet(f"color: {SM.t('danger')}; border: none;"); self.maint_info.setText("✗ Yazıcı ve bakım türü zorunlu."); return
+        try: cost=float(self.e_maint_cost.text().replace(",",".") or "0")
+        except: cost=0
+        items=load_json(MAINTENANCE_FILE,[])
+        items.append({"owner":self.user,"yazici":printer,"tur":mtype,"kategori":self.cb_maint_cat.currentText(),"maliyet":cost,"not":self.e_maint_note.text().strip(),"tarih":datetime.now().strftime("%d.%m.%Y %H:%M")})
+        save_json(MAINTENANCE_FILE,items)
+        self.maint_info.setStyleSheet(f"color: {SM.t('success')}; border: none;"); self.maint_info.setText("✓ Bakım kaydedildi.")
+        self.e_maint_printer.clear(); self.e_maint_type.clear(); self.e_maint_cost.setText("0"); self.e_maint_note.clear(); self._refresh()
+
+    def _del_maint(self):
+        rows=self.table.selectedItems(); idx=self.table.row(rows[0]) if rows else -1
+        if idx<0:
+            try: idx=int(self.sel_input.text().strip())-1
+            except: idx=-1
+        if idx<0 or idx>=len(self.all_maintenance): return
+        items=load_json(MAINTENANCE_FILE,[]); target=self.all_maintenance[idx]
+        real=next((i for i,m in enumerate(items) if m.get("tarih")==target.get("tarih")),-1)
+        if real>=0: items.pop(real)
+        save_json(MAINTENANCE_FILE,items); self._refresh()
+
+    def _refresh(self):
+        all_m=load_json(MAINTENANCE_FILE,[]); self.all_maintenance=[m for m in all_m if m.get("owner")==self.user]
+        self.table.setRowCount(len(self.all_maintenance))
+        for i,m in enumerate(self.all_maintenance):
+            for j,val in enumerate([str(i+1),m.get("yazici",""),m.get("tur",""),m.get("kategori",""),f"{m.get('maliyet',0):.2f} TL",m.get("tarih","")[:10]]):
+                item=QTableWidgetItem(val); item.setFlags(item.flags()&~Qt.ItemFlag.ItemIsEditable); self.table.setItem(i,j,item)
+
+    def refresh(self): self._refresh()
+
+
+class LogPage(QWidget):
+    def __init__(self, user, parent=None):
+        super().__init__(parent)
+        self.user = user
+        self._build_ui()
+        self._refresh()
+
+    def _build_ui(self):
+        l=QVBoxLayout(self); l.setContentsMargins(16,16,16,16)
+        hdr=QHBoxLayout(); hl=QLabel("📋 AKTİVİTE LOGU"); hl.setFont(QFont("Courier New",16,QFont.Weight.Bold))
+        hl.setStyleSheet(f"color: {SM.t('accent')}; border: none;"); hdr.addWidget(hl); hdr.addStretch()
+        ref_btn=StyledButton("🔃 Yenile","flat"); ref_btn.clicked.connect(self._refresh)
+        clr_btn=StyledButton("🗑 Temizle","danger"); clr_btn.clicked.connect(self._clear)
+        hdr.addWidget(ref_btn); hdr.addWidget(clr_btn); l.addLayout(hdr)
+        self.table=QTableWidget(); self.table.setColumnCount(3)
+        self.table.setHorizontalHeaderLabels(["Tarih","İşlem","Detay"])
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch); self.table.setAlternatingRowColors(True); l.addWidget(self.table)
+
+    def _refresh(self):
+        logs=[l for l in load_json(LOG_FILE,[]) if l.get("owner")==self.user]
+        self.table.setRowCount(len(logs))
+        icon_map={"GİRİŞ":"▶","PROJE EKLENDİ":"➕","PROJE SİLİNDİ":"🗑","PROJE GÜNCELLENDİ":"✏️","STOK GÜNCELLENDİ":"📦","SATIŞ KAYDEDİLDİ":"💰","GİDER KAYDEDİLDİ":"📤","MÜŞTERİ EKLENDİ":"👥"}
+        for i,l in enumerate(reversed(logs)):
+            icon=icon_map.get(l.get("action",""),"·")
+            for j,val in enumerate([l.get("tarih",""),f"{icon} {l.get('action','')}",l.get("detail","")]):
+                item=QTableWidgetItem(val); item.setFlags(item.flags()&~Qt.ItemFlag.ItemIsEditable); self.table.setItem(i,j,item)
+
+    def _clear(self):
+        if QMessageBox.question(self,"Onay","Tüm log silinsin mi?",
+            QMessageBox.StandardButton.Yes|QMessageBox.StandardButton.No)==QMessageBox.StandardButton.Yes:
+            all_l=load_json(LOG_FILE,[]); save_json(LOG_FILE,[l for l in all_l if l.get("owner")!=self.user]); self._refresh()
+
+    def refresh(self): self._refresh()
+
+
+# ═══════════════════════════════════════════════════════════════
+#  İSTATİSTİKLER
+# ═══════════════════════════════════════════════════════════════
+class StatsPage(QWidget):
+    def __init__(self, user, parent=None):
+        super().__init__(parent)
+        self.user = user
+        self._build_ui()
+        self._refresh()
+
+    def _build_ui(self):
+        layout=QVBoxLayout(self); layout.setContentsMargins(0,0,0,0)
+        scroll=QScrollArea(); scroll.setWidgetResizable(True); scroll.setFrameShape(QFrame.Shape.NoFrame)
+        content=QWidget(); self.cl=QVBoxLayout(content); self.cl.setContentsMargins(20,16,20,20); self.cl.setSpacing(12)
+        scroll.setWidget(content); layout.addWidget(scroll)
+        ref_btn=StyledButton("🔃 Yenile","flat"); ref_btn.setMaximumWidth(100); ref_btn.clicked.connect(self._refresh); self.cl.addWidget(ref_btn)
+
+    def _refresh(self):
+        while self.cl.count()>1:
+            item=self.cl.takeAt(1)
+            if item.widget(): item.widget().deleteLater()
+        projects=u_load(PROJECTS_FILE,self.user); sales=u_load(SALES_FILE,self.user); expenses=u_load(EXPENSES_FILE,self.user)
+        self.cl.addWidget(SectionHeader("🧵 Filament Kullanımı"))
+        fil_row=QHBoxLayout(); fil_use={}
+        for p in projects:
+            f=p.get("filament_turu","?"); fil_use[f]=fil_use.get(f,0)+p.get("gram",0)
+        fil_card=CardFrame(); fl=QVBoxLayout(fil_card); fl.setContentsMargins(12,12,12,12)
+        if fil_use:
+            bc=BarChart(fil_use,SM.t("accent")); bc.setMinimumHeight(130); fil_row.addWidget(bc,stretch=2)
+            dc=DonutChart(fil_use,155); fil_row.addWidget(dc)
+        else: fil_row.addWidget(QLabel("Veri yok."))
+        fl.addLayout(fil_row); self.cl.addWidget(fil_card)
+
+        self.cl.addWidget(SectionHeader("🏆 En Çok Satan Ürünler"))
+        urun_totals={}
+        for s in sales: u=s.get("urun","?"); urun_totals[u]=urun_totals.get(u,0)+s.get("satis_fiyati",0)
+        top5=dict(sorted(urun_totals.items(),key=lambda x:x[1],reverse=True)[:8])
+        top_card=CardFrame(); tl=QVBoxLayout(top_card); tl.setContentsMargins(12,12,12,12)
+        if top5:
+            bc2=BarChart(top5,SM.t("success")); bc2.setMinimumHeight(130); tl.addWidget(bc2)
+            medals=["🥇","🥈","🥉","🏅","🏅","🏅","🏅","🏅"]
+            for i,(u,t) in enumerate(top5.items()):
+                row_l=QHBoxLayout(); row_l.addWidget(QLabel(f"{medals[i]} {i+1}. {u}"))
+                val=QLabel(f"{t:,.2f} TL"); val.setStyleSheet(f"color: {SM.t('success')}; font-weight: bold; border: none;")
+                row_l.addStretch(); row_l.addWidget(val); tl.addLayout(row_l)
+        else: tl.addWidget(QLabel("Satış yok."))
+        self.cl.addWidget(top_card)
+
+        self.cl.addWidget(SectionHeader("📅 Son 6 Ay Gelir vs Gider"))
+        monthly_card=CardFrame(); ml=QVBoxLayout(monthly_card); ml.setContentsMargins(12,12,12,12)
+        months={}
+        for i in range(5,-1,-1):
+            d=datetime.now()-timedelta(days=30*i); key=d.strftime("%m.%Y"); months[key]={"gelir":0,"gider":0}
+        for s in sales:
+            key=s.get("tarih","")[:7]
+            if key in months: months[key]["gelir"]+=s.get("satis_fiyati",0)
+        for e in expenses:
+            key=e.get("tarih","")[:7]
+            if key in months: months[key]["gider"]+=e.get("tutar",0)
+        gelir_data={k:v["gelir"] for k,v in months.items()}; gider_data={k:v["gider"] for k,v in months.items()}
+        bar_row=QHBoxLayout()
+        bc_gelir=BarChart(gelir_data,SM.t("success")); bc_gelir.setMinimumHeight(100)
+        bc_gider=BarChart(gider_data,SM.t("danger")); bc_gider.setMinimumHeight(100)
+        bar_row.addWidget(bc_gelir); bar_row.addWidget(bc_gider)
+        lbl_row=QHBoxLayout()
+        g1=QLabel("■ Gelir"); g1.setStyleSheet(f"color: {SM.t('success')}; border: none;")
+        g2=QLabel("■ Gider"); g2.setStyleSheet(f"color: {SM.t('danger')}; border: none;")
+        lbl_row.addWidget(g1); lbl_row.addWidget(g2); lbl_row.addStretch()
+        ml.addLayout(bar_row); ml.addLayout(lbl_row); self.cl.addWidget(monthly_card)
+
+        self.cl.addWidget(SectionHeader("💡 ROI & Elektrik Raporu"))
+        roi_card=CardFrame(); rl=QVBoxLayout(roi_card); rl.setContentsMargins(12,12,12,12)
+        total_elec=sum(p.get("elektrik_maliyet",0) for p in projects)
+        total_fil=sum(p.get("filament_maliyet",0) for p in projects)
+        total_cost=sum(p.get("toplam_maliyet",0) for p in projects)
+        total_rev=sum(s.get("satis_fiyati",0) for s in sales)
+        total_exp=sum(e.get("tutar",0) for e in expenses)
+        net=total_rev-total_cost-total_exp; roi=(net/total_cost*100) if total_cost>0 else 0
+        stats_text=QTextEdit(); stats_text.setReadOnly(True); stats_text.setFont(QFont("Courier New",12)); stats_text.setMaximumHeight(200)
+        stats_text.setStyleSheet(f"background: {SM.t('input_bg')}; color: {SM.t('text')}; border: 1px solid {SM.t('border')};")
+        stats_text.setPlainText(
+            f" Filament Maliyeti : {total_fil:>10,.2f} TL\n Elektrik Maliyeti : {total_elec:>10,.2f} TL\n"
+            f" Toplam Prj Maliyet: {total_cost:>10,.2f} TL\n Toplam Satış      : {total_rev:>10,.2f} TL\n"
+            f" Toplam Gider      : {total_exp:>10,.2f} TL\n Net Kar           : {net:>10,.2f} TL\n ROI               : {roi:>9,.1f} %\n")
+        rl.addWidget(stats_text); self.cl.addWidget(roi_card); self.cl.addStretch()
+
+    def refresh(self): self._refresh()
+
+
+# ═══════════════════════════════════════════════════════════════
+#  AYARLAR — AI API KEY + GÜNLÜK ÖZET SAATI
+# ═══════════════════════════════════════════════════════════════
+class SettingsPage(QWidget):
+    theme_changed = pyqtSignal()
+
+    def __init__(self, user, parent=None):
+        super().__init__(parent)
+        self.user = user
+        self._build_ui()
+
+    def _build_ui(self):
+        scroll=QScrollArea(); scroll.setWidgetResizable(True); scroll.setFrameShape(QFrame.Shape.NoFrame)
+        content=QWidget(); cl=QVBoxLayout(content); cl.setContentsMargins(20,16,20,20); cl.setSpacing(12)
+        scroll.setWidget(content)
+        layout=QVBoxLayout(self); layout.setContentsMargins(0,0,0,0); layout.addWidget(scroll)
+        settings=get_settings()
+
+        # ── AI Asistan ─────────────────────────────────
+        cl.addWidget(SectionHeader("🤖 AI Asistan Ayarları"))
+        ai_card=CardFrame(); al=QVBoxLayout(ai_card); al.setContentsMargins(20,16,20,16); al.setSpacing(8)
+        al.addWidget(QLabel("OpenAI API Key:"))
+        self.e_api_key=QLineEdit()
+        self.e_api_key.setPlaceholderText("sk-... (OpenAI API anahtarınız)")
+        self.e_api_key.setText(settings.get("openai_api_key",""))
+        self.e_api_key.setEchoMode(QLineEdit.EchoMode.Password)
+        self.e_api_key.setMinimumHeight(44)
+        show_key_btn=QPushButton("👁")
+        show_key_btn.setFixedSize(36,44)
+        show_key_btn.setStyleSheet(f"background: {SM.t('input_bg')}; color: {SM.t('text')}; border: 1px solid {SM.t('border')}; border-radius: 8px;")
+        show_key_btn.pressed.connect(lambda: self.e_api_key.setEchoMode(QLineEdit.EchoMode.Normal))
+        show_key_btn.released.connect(lambda: self.e_api_key.setEchoMode(QLineEdit.EchoMode.Password))
+        key_row=QHBoxLayout(); key_row.addWidget(self.e_api_key); key_row.addWidget(show_key_btn)
+        al.addLayout(key_row)
+        al.addWidget(QLabel("💡 API key'i Ayarlar'dan girmek daha güvenli — asla kod içine yazmayın."))
+
+        hour_row=QHBoxLayout()
+        hour_row.addWidget(QLabel("Günlük Özet Saati (0-23):"))
+        self.e_summary_hour=QSpinBox(); self.e_summary_hour.setRange(0,23); self.e_summary_hour.setValue(settings.get("daily_summary_hour",9)); self.e_summary_hour.setMinimumHeight(38); self.e_summary_hour.setMaximumWidth(100)
+        hour_row.addWidget(self.e_summary_hour); hour_row.addStretch()
+        al.addLayout(hour_row)
+
+        tts_row=QHBoxLayout()
+        tts_row.addWidget(QLabel("TTS (Sesli Yanıt) Motoru:"))
+        self.cb_tts=QComboBox(); self.cb_tts.setMinimumHeight(38); self.cb_tts.setMaximumWidth(200)
+        self.cb_tts.addItems(["gtts (Google TTS)","pyttsx3 (Offline)"]); tts_row.addWidget(self.cb_tts); tts_row.addStretch()
+        al.addLayout(tts_row)
+
+        save_ai=StyledButton("💾 AI Ayarlarını Kaydet","ai"); save_ai.clicked.connect(self._save_ai_settings); al.addWidget(save_ai)
+        self.ai_info=QLabel(""); self.ai_info.setStyleSheet(f"color: {SM.t('success')}; border: none;"); al.addWidget(self.ai_info)
+        test_btn=StyledButton("🧪 API Bağlantısını Test Et","flat"); test_btn.clicked.connect(self._test_api); al.addWidget(test_btn)
+        cl.addWidget(ai_card)
+
+        # ── Tema ──────────────────────────────────────
+        cl.addWidget(SectionHeader("🎨 Tema Seçimi"))
+        theme_card=CardFrame(); tl=QVBoxLayout(theme_card); tl.setContentsMargins(20,16,20,16)
+        theme_row=QHBoxLayout()
+        self.cb_theme=QComboBox(); self.cb_theme.setMinimumHeight(40); self.cb_theme.addItems(list(THEMES.keys()))
+        idx=self.cb_theme.findText(settings.get("theme","🌑 Karanlık"))
+        if idx>=0: self.cb_theme.setCurrentIndex(idx)
+        theme_row.addWidget(self.cb_theme)
+        apply_btn=StyledButton("✅ Temayı Uygula"); apply_btn.clicked.connect(self._apply_theme); theme_row.addWidget(apply_btn)
+        tl.addLayout(theme_row); cl.addWidget(theme_card)
+
+        # ── Genel Ayarlar ─────────────────────────────
+        cl.addWidget(SectionHeader("⚙️ Genel Ayarlar"))
+        gen_card=CardFrame(); gl=QVBoxLayout(gen_card); gl.setContentsMargins(20,16,20,16); gl.setSpacing(8)
+        for lbl_text,attr,default in [("Elektrik Fiyatı (TL/kWh):","e_elec","elektrik_fiyati"),("KDV Oranı (%):","e_kdv","kdv_rate"),("Düşük Stok Eşiği (g):","e_thr","low_stock_threshold")]:
+            row=QHBoxLayout(); row.addWidget(QLabel(lbl_text))
+            e=QLineEdit(); e.setText(str(settings.get(default,""))); e.setMinimumHeight(38); e.setMaximumWidth(150)
+            row.addWidget(e); row.addStretch(); gl.addLayout(row); setattr(self,attr,e)
+        for lbl_text,attr,default in [("Şirket Adı:","e_company","company_name"),("Şirket Adresi:","e_address","company_address"),("Telefon:","e_phone","company_phone"),("E-posta:","e_cemail","company_email")]:
+            row=QHBoxLayout(); row.addWidget(QLabel(lbl_text))
+            e=QLineEdit(); e.setText(str(settings.get(default,""))); e.setMinimumHeight(38); e.setMaximumWidth(300)
+            row.addWidget(e); row.addStretch(); gl.addLayout(row); setattr(self,attr,e)
+        save_gen=StyledButton("💾 Genel Ayarları Kaydet"); save_gen.clicked.connect(self._save_general); gl.addWidget(save_gen)
+        self.gen_info=QLabel(""); self.gen_info.setStyleSheet(f"color: {SM.t('success')}; border: none;"); gl.addWidget(self.gen_info)
+        cl.addWidget(gen_card)
+
+        # ── Şifre ─────────────────────────────────────
+        cl.addWidget(SectionHeader("🔐 Şifre Değiştir"))
+        pw_card=CardFrame(); pwl=QHBoxLayout(pw_card); pwl.setContentsMargins(20,16,20,16)
+        self.pw_old=QLineEdit(); self.pw_old.setPlaceholderText("Mevcut şifre"); self.pw_old.setEchoMode(QLineEdit.EchoMode.Password); self.pw_old.setMinimumHeight(40)
+        self.pw_new=QLineEdit(); self.pw_new.setPlaceholderText("Yeni şifre"); self.pw_new.setEchoMode(QLineEdit.EchoMode.Password); self.pw_new.setMinimumHeight(40)
+        self.pw_new2=QLineEdit(); self.pw_new2.setPlaceholderText("Tekrar"); self.pw_new2.setEchoMode(QLineEdit.EchoMode.Password); self.pw_new2.setMinimumHeight(40)
+        change_btn=StyledButton("Değiştir","success"); change_btn.clicked.connect(self._change_password)
+        for w in [self.pw_old,self.pw_new,self.pw_new2,change_btn]: pwl.addWidget(w)
+        self.pw_info=QLabel(""); self.pw_info.setStyleSheet(f"color: {SM.t('success')}; border: none;"); pwl.addWidget(self.pw_info)
+        cl.addWidget(pw_card)
+
+        # ── Veri Yönetimi ─────────────────────────────
+        cl.addWidget(SectionHeader("🗄️ Veri Yönetimi"))
+        data_card=CardFrame(); dl=QHBoxLayout(data_card); dl.setContentsMargins(20,16,20,16)
+        for text,func,style in [("💾 Yedek Al",self._do_backup,"primary"),("📊 Özet Rapor",self._summary,"flat"),("📥 Tüm CSV",self._export_all,"flat"),("🗑 Tüm Projeler Sil",self._del_all,"danger")]:
+            btn=StyledButton(text,style); btn.clicked.connect(func); dl.addWidget(btn)
+        cl.addWidget(data_card)
+        cl.addStretch()
+
+    def _save_ai_settings(self):
+        s=get_settings()
+        s["openai_api_key"]=self.e_api_key.text().strip()
+        s["daily_summary_hour"]=self.e_summary_hour.value()
+        tts_map={"gtts (Google TTS)":"gtts","pyttsx3 (Offline)":"pyttsx3"}
+        s["tts_engine"]=tts_map.get(self.cb_tts.currentText(),"gtts")
+        save_settings(s)
+        self.ai_info.setStyleSheet(f"color: {SM.t('success')}; border: none;"); self.ai_info.setText("✓ AI ayarları kaydedildi.")
+
+    def _test_api(self):
+        api_key=self.e_api_key.text().strip()
+        if not api_key:
+            self.ai_info.setStyleSheet(f"color: {SM.t('danger')}; border: none;"); self.ai_info.setText("✗ API key boş."); return
+        if not OPENAI_OK:
+            self.ai_info.setStyleSheet(f"color: {SM.t('danger')}; border: none;"); self.ai_info.setText("✗ openai kütüphanesi kurulu değil."); return
+        self.ai_info.setText("⏳ Test ediliyor...")
+        def run_test():
+            try:
+                client=OpenAI(api_key=api_key)
+                resp=client.chat.completions.create(model="gpt-4o",messages=[{"role":"user","content":"Merhaba, bağlantı testi."}],max_tokens=20)
+                txt=resp.choices[0].message.content
+                self.ai_info.setStyleSheet(f"color: {SM.t('success')}; border: none;"); self.ai_info.setText(f"✓ Bağlantı başarılı! GPT: {txt[:50]}")
+            except Exception as ex:
+                self.ai_info.setStyleSheet(f"color: {SM.t('danger')}; border: none;"); self.ai_info.setText(f"✗ Hata: {str(ex)[:100]}")
+        t=threading.Thread(target=run_test,daemon=True); t.start()
+
+    def _apply_theme(self):
+        theme_name=self.cb_theme.currentText(); SM.set_theme(theme_name)
+        s=get_settings(); s["theme"]=theme_name; save_settings(s)
+        QApplication.instance().setStyleSheet(SM.get_app_stylesheet()); self.theme_changed.emit()
+        QMessageBox.information(self,"Tema",f"'{theme_name}' uygulandı!")
+
+    def _save_general(self):
+        try:
+            s=get_settings()
+            s["elektrik_fiyati"]=float(self.e_elec.text().replace(",","."))
+            s["kdv_rate"]=float(self.e_kdv.text().replace(",","."))
+            s["low_stock_threshold"]=float(self.e_thr.text().replace(",","."))
+            s["company_name"]=self.e_company.text().strip()
+            s["company_address"]=self.e_address.text().strip()
+            s["company_phone"]=self.e_phone.text().strip()
+            s["company_email"]=self.e_cemail.text().strip()
+            save_settings(s)
+            self.gen_info.setStyleSheet(f"color: {SM.t('success')}; border: none;"); self.gen_info.setText("✓ Ayarlar kaydedildi.")
+        except ValueError:
+            self.gen_info.setStyleSheet(f"color: {SM.t('danger')}; border: none;"); self.gen_info.setText("✗ Geçerli sayı gir.")
+
+    def _change_password(self):
+        old=self.pw_old.text().strip(); new=self.pw_new.text().strip(); new2=self.pw_new2.text().strip()
+        if not old or not new or len(new)<4 or new!=new2:
+            self.pw_info.setStyleSheet(f"color: {SM.t('danger')}; border: none;"); self.pw_info.setText("✗ Kontrol edin."); return
+        users=load_users(); changed=False
+        for u in users:
+            if u["username"]==self.user and u.get("password_hash")==hash_password(old):
+                u["password_hash"]=hash_password(new); changed=True; break
+        if not changed:
+            self.pw_info.setStyleSheet(f"color: {SM.t('danger')}; border: none;"); self.pw_info.setText("✗ Şifre yanlış."); return
+        save_users(users)
+        self.pw_info.setStyleSheet(f"color: {SM.t('success')}; border: none;"); self.pw_info.setText("✓ Güncellendi.")
+        for e in [self.pw_old,self.pw_new,self.pw_new2]: e.clear()
+
+    def _do_backup(self):
+        p=do_backup(); QMessageBox.information(self,"Yedek",f"Yedek alındı:\n{p}")
+
+    def _summary(self):
+        projects=u_load(PROJECTS_FILE,self.user); sales=u_load(SALES_FILE,self.user)
+        expenses=u_load(EXPENSES_FILE,self.user); customers=u_load(CUSTOMERS_FILE,self.user)
+        stock=load_json(STOCK_FILE,{})
+        t_mal=sum(p.get("toplam_maliyet",0) for p in projects); t_sat=sum(s.get("satis_fiyati",0) for s in sales)
+        t_gid=sum(e.get("tutar",0) for e in expenses); net=t_sat-t_mal-t_gid; t_stk=sum(stock.values())
+        report=("╔"+"═"*43+"╗\n"+f"║   ATÖLYE ÖZET  —  {self.user:<22}║\n"+f"║   {datetime.now().strftime('%d.%m.%Y %H:%M'):<38}║\n"+"╠"+"═"*43+"╣\n"
+                +f"║  Toplam Proje     : {len(projects):<23}║\n"+f"║  Proje Maliyeti   : {t_mal:>10,.2f} TL{'':<10}║\n"
+                +f"║  Toplam Satış     : {t_sat:>10,.2f} TL{'':<10}║\n"+f"║  Toplam Gider     : {t_gid:>10,.2f} TL{'':<10}║\n"
+                +f"║  NET KAR / ZARAR  : {net:>10,.2f} TL{'':<10}║\n"+"╠"+"═"*43+"╣\n"
+                +f"║  Müşteri Sayısı   : {len(customers):<23}║\n"+f"║  Toplam Stok      : {t_stk:>10,.0f} g{'':<12}║\n"+"╚"+"═"*43+"╝\n")
+        dlg=QDialog(self); dlg.setWindowTitle("Özet Rapor"); dlg.setMinimumSize(520,400)
+        dlg.setStyleSheet(f"background: {SM.t('bg')}; color: {SM.t('text')};")
+        l=QVBoxLayout(dlg); te=QTextEdit(); te.setReadOnly(True); te.setPlainText(report)
+        te.setFont(QFont("Courier New",12)); te.setStyleSheet(f"background: {SM.t('input_bg')}; color
