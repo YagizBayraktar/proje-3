@@ -13,3 +13,15 @@ giriş yapınca karşınıza burası çıkıyo burda yaptığınız çoğu şeyi
 sol taraftaki bölmelerden yapmak istediğiniz işlemi seçiniz ve giriş yapınız 
 <img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/78267c96-c36e-4228-84a3-82803ac6ae42" />
 ayarlardan görünüm modu  verilerinizin  raporu  vs cvs sini indirebilir  paylaşabilirsiniz ve alt taraftanda şifrenizi değiştirebilirsiniz
+
+
+
+
+
+
+
+
+
+
+vide = https://drive.google.com/file/d/1T6pTqTrlZILWt-fqGzKSEVi1dq9p2VQ7/view?usp=drive_link
+
